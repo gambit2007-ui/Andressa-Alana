@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -258,7 +258,7 @@ const Sidebar = () => {
           <Sparkles className="w-8 h-8 text-brand-500" />
           Andressa Alana
         </h1>
-        <p className="text-xs text-brand-400 uppercase tracking-widest mt-1 font-medium">GestÃ£o de EstÃ©tica</p>
+        <p className="text-xs text-brand-400 uppercase tracking-widest mt-1 font-medium">Gestão de Estética</p>
       </div>
 
       <nav className="flex-1 space-y-2">
@@ -375,7 +375,7 @@ const Dashboard = () => {
     <div className="space-y-8">
       <header>
         <h2 className="text-3xl sm:text-4xl font-serif font-bold text-brand-900">Bem-vinda de volta!</h2>
-        <p className="text-brand-500">Aqui estÃ¡ o resumo do seu dia hoje, {format(new Date(), "dd 'de' MMMM", { locale: ptBR })}.</p>
+        <p className="text-brand-500">Aqui está o resumo do seu dia hoje, {format(new Date(), "dd 'de' MMMM", { locale: ptBR })}.</p>
       </header>
 
       {error && (
@@ -411,7 +411,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section className="glass-card p-8">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-2xl font-serif font-bold">PrÃ³ximos atendimentos</h3>
+            <h3 className="text-2xl font-serif font-bold">Próximos atendimentos</h3>
             <Link to="/agenda" className="text-brand-500 hover:text-brand-700 text-sm font-medium flex items-center gap-1">
               Ver agenda completa <ChevronRight className="w-4 h-4" />
             </Link>
@@ -439,7 +439,7 @@ const Dashboard = () => {
                     apt.status === 'scheduled' ? "bg-blue-100 text-blue-700" :
                     apt.status === 'completed' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                   )}>
-                    {apt.status === 'scheduled' ? 'Agendado' : apt.status === 'completed' ? 'ConcluÃ­do' : 'Cancelado'}
+                    {apt.status === 'scheduled' ? 'Agendado' : apt.status === 'completed' ? 'Concluído' : 'Cancelado'}
                   </div>
                 </div>
               ))
@@ -448,7 +448,7 @@ const Dashboard = () => {
         </section>
 
         <section className="glass-card p-8">
-          <h3 className="text-2xl font-serif font-bold mb-6">AÃ§Ãµes rÃ¡pidas</h3>
+          <h3 className="text-2xl font-serif font-bold mb-6">Ações rápidas</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Link to="/agenda" className="p-6 rounded-3xl bg-brand-700 text-white hover:bg-brand-800 transition-all flex flex-col items-center gap-3 text-center">
               <Plus className="w-8 h-8" />
@@ -565,7 +565,7 @@ const Clients = () => {
 
   const handleDeleteClient = async (client: Client) => {
     const confirmed = window.confirm(
-      `Excluir cliente "${client.name}"? Esta aÃ§Ã£o remove tambÃ©m os agendamentos desse cliente.`,
+      `Excluir cliente "${client.name}"? Esta ação remove também os agendamentos desse cliente.`,
     );
     if (!confirmed) return;
 
@@ -584,7 +584,7 @@ const Clients = () => {
       <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end">
         <div>
           <h2 className="text-3xl sm:text-4xl font-serif font-bold text-brand-900">Clientes</h2>
-          <p className="text-brand-500">Gerencie sua base de clientes e histÃ³ricos.</p>
+          <p className="text-brand-500">Gerencie sua base de clientes e históricos.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -643,10 +643,10 @@ const Clients = () => {
               <h4 className="text-xl font-bold text-brand-900 mb-1">{client.name}</h4>
               <div className="space-y-2 text-sm text-brand-500">
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" /> {client.phone || 'NÃ£o informado'}
+                  <Phone className="w-4 h-4" /> {client.phone || 'Não informado'}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" /> {client.email || 'NÃ£o informado'}
+                  <Mail className="w-4 h-4" /> {client.email || 'Não informado'}
                 </div>
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4" /> {client.attachments?.length ?? 0} arquivo(s)
@@ -735,7 +735,7 @@ const Clients = () => {
                     {newClient.profilePhoto && (
                       <img
                         src={newClient.profilePhoto.dataUrl}
-                        alt="PrÃ©via do perfil"
+                        alt="Prévia do perfil"
                         className="mt-2 w-20 h-20 object-cover rounded-xl border border-brand-200"
                       />
                     )}
@@ -761,7 +761,7 @@ const Clients = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-brand-700 mb-1">ObservaÃ§Ãµes</label>
+                  <label className="block text-sm font-bold text-brand-700 mb-1">Observações</label>
                   <textarea
                     rows={3}
                     className="w-full px-4 py-3 rounded-xl border border-brand-200 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
@@ -853,7 +853,7 @@ const Agenda = () => {
 
   const handleDeleteAppointment = async (appointment: Appointment) => {
     const confirmed = window.confirm(
-      `Excluir agendamento de ${appointment.client_name} Ã s ${appointment.appointment_time}?`,
+      `Excluir agendamento de ${appointment.client_name} às ${appointment.appointment_time}?`,
     );
     if (!confirmed) return;
 
@@ -893,7 +893,7 @@ const Agenda = () => {
       <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end">
         <div>
           <h2 className="text-3xl sm:text-4xl font-serif font-bold text-brand-900">Agenda</h2>
-          <p className="text-brand-500">Organize seus atendimentos diÃ¡rios.</p>
+          <p className="text-brand-500">Organize seus atendimentos diários.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -986,7 +986,7 @@ const Agenda = () => {
                     apt.status === 'scheduled' ? "bg-blue-100 text-blue-700" :
                     apt.status === 'completed' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                   )}>
-                    {apt.status === 'scheduled' ? 'Agendado' : apt.status === 'completed' ? 'ConcluÃ­do' : 'Cancelado'}
+                    {apt.status === 'scheduled' ? 'Agendado' : apt.status === 'completed' ? 'Concluído' : 'Cancelado'}
                   </div>
                 </div>
               </div>
@@ -1003,7 +1003,7 @@ const Agenda = () => {
             <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
               <div className="p-8 border-b border-brand-100">
                 <h3 className="text-2xl font-serif font-bold">Novo Agendamento</h3>
-                <p className="text-brand-500">Marque um novo horÃ¡rio para sua cliente.</p>
+                <p className="text-brand-500">Marque um novo horário para sua cliente.</p>
               </div>
               <form onSubmit={handleSubmit} className="p-8 space-y-4">
                 <div>
@@ -1042,7 +1042,7 @@ const Agenda = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-brand-700 mb-1">HorÃ¡rio *</label>
+                    <label className="block text-sm font-bold text-brand-700 mb-1">Horário *</label>
                     <input
                       required
                       type="time"
@@ -1166,7 +1166,7 @@ const Procedures = () => {
 
   const handleDeleteProcedure = async (procedure: Procedure) => {
     const confirmed = window.confirm(
-      `Excluir procedimento "${procedure.name}"? Agendamentos vinculados tambÃ©m serÃ£o removidos.`,
+      `Excluir procedimento "${procedure.name}"? Agendamentos vinculados também serão removidos.`,
     );
     if (!confirmed) return;
 
@@ -1185,7 +1185,7 @@ const Procedures = () => {
       <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end">
         <div>
           <h2 className="text-3xl sm:text-4xl font-serif font-bold text-brand-900">Procedimentos</h2>
-          <p className="text-brand-500">Cadastre e gerencie seus serviÃ§os com fotos e arquivos.</p>
+          <p className="text-brand-500">Cadastre e gerencie seus serviços com fotos e arquivos.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -1225,11 +1225,11 @@ const Procedures = () => {
               )}
             </div>
             <h4 className="text-2xl font-serif font-bold text-brand-900 mb-2">{proc.name}</h4>
-            <p className="text-brand-500 text-sm mb-6 flex-1">{proc.description || 'Sem descriÃ§Ã£o.'}</p>
+            <p className="text-brand-500 text-sm mb-6 flex-1">{proc.description || 'Sem descrição.'}</p>
             <p className="text-xs text-brand-400 mb-4">Arquivos: {proc.attachments?.length ?? 0}</p>
             <div className="flex justify-between items-end pt-4 border-t border-brand-100">
               <div>
-                <p className="text-xs text-brand-400 font-bold uppercase tracking-widest">DuraÃ§Ã£o</p>
+                <p className="text-xs text-brand-400 font-bold uppercase tracking-widest">Duração</p>
                 <p className="font-bold text-brand-800">{proc.duration} min</p>
               </div>
               <div className="text-right">
@@ -1273,7 +1273,7 @@ const Procedures = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-brand-700 mb-1">DescriÃ§Ã£o</label>
+                  <label className="block text-sm font-bold text-brand-700 mb-1">Descrição</label>
                   <textarea
                     rows={2}
                     className="w-full px-4 py-3 rounded-xl border border-brand-200 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
@@ -1283,7 +1283,7 @@ const Procedures = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-brand-700 mb-1">PreÃ§o (R$) *</label>
+                    <label className="block text-sm font-bold text-brand-700 mb-1">Preço (R$) *</label>
                     <input
                       required
                       type="number"
@@ -1294,7 +1294,7 @@ const Procedures = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-brand-700 mb-1">DuraÃ§Ã£o (min) *</label>
+                    <label className="block text-sm font-bold text-brand-700 mb-1">Duração (min) *</label>
                     <input
                       required
                       type="number"
@@ -1316,7 +1316,7 @@ const Procedures = () => {
                     {newProc.coverPhoto && (
                       <img
                         src={newProc.coverPhoto.dataUrl}
-                        alt="PrÃ©via procedimento"
+                        alt="Prévia procedimento"
                         className="mt-2 w-20 h-20 object-cover rounded-xl border border-brand-200"
                       />
                     )}
@@ -1366,7 +1366,7 @@ const ClientDetail = () => {
 
     const loadClient = async () => {
       if (!id) {
-        setError('Cliente invÃ¡lido.');
+        setError('Cliente inválido.');
         setLoading(false);
         return;
       }
@@ -1406,7 +1406,7 @@ const ClientDetail = () => {
           <ArrowLeft className="w-5 h-5" /> Voltar
         </button>
         <div className="glass-card p-6 text-red-700 bg-red-50 border-red-200">
-          {error ?? 'Cliente nÃ£o encontrado.'}
+          {error ?? 'Cliente não encontrado.'}
         </div>
       </div>
     );
@@ -1436,29 +1436,29 @@ const ClientDetail = () => {
                 <Phone className="w-5 h-5 text-brand-500" />
                 <div>
                   <p className="text-xs text-brand-400 font-bold uppercase">Telefone</p>
-                  <p className="font-bold text-brand-800">{client.phone || 'NÃ£o informado'}</p>
+                  <p className="font-bold text-brand-800">{client.phone || 'Não informado'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-xl">
                 <Mail className="w-5 h-5 text-brand-500" />
                 <div>
                   <p className="text-xs text-brand-400 font-bold uppercase">E-mail</p>
-                  <p className="font-bold text-brand-800 truncate">{client.email || 'NÃ£o informado'}</p>
+                  <p className="font-bold text-brand-800 truncate">{client.email || 'Não informado'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-xl">
                 <Calendar className="w-5 h-5 text-brand-500" />
                 <div>
-                  <p className="text-xs text-brand-400 font-bold uppercase">AniversÃ¡rio</p>
-                  <p className="font-bold text-brand-800">{client.birth_date ? format(parseISO(client.birth_date), 'dd/MM/yyyy') : 'NÃ£o informado'}</p>
+                  <p className="text-xs text-brand-400 font-bold uppercase">Aniversário</p>
+                  <p className="font-bold text-brand-800">{client.birth_date ? format(parseISO(client.birth_date), 'dd/MM/yyyy') : 'Não informado'}</p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="glass-card p-8">
-            <h4 className="font-bold text-brand-900 mb-4">ObservaÃ§Ãµes gerais</h4>
-            <p className="text-brand-600 text-sm leading-relaxed">{client.notes || 'Nenhuma observaÃ§Ã£o cadastrada.'}</p>
+            <h4 className="font-bold text-brand-900 mb-4">Observações gerais</h4>
+            <p className="text-brand-600 text-sm leading-relaxed">{client.notes || 'Nenhuma observação cadastrada.'}</p>
           </div>
 
           <div className="glass-card p-8">
@@ -1485,7 +1485,7 @@ const ClientDetail = () => {
 
         <div className="lg:col-span-2 space-y-8">
           <section className="glass-card p-8">
-            <h3 className="text-2xl font-serif font-bold mb-6">HistÃ³rico de atendimentos</h3>
+            <h3 className="text-2xl font-serif font-bold mb-6">Histórico de atendimentos</h3>
             <div className="space-y-4">
               {client.appointments.length === 0 ? (
                 <p className="text-center py-10 text-brand-400 italic">Nenhum atendimento registrado.</p>
@@ -1504,7 +1504,7 @@ const ClientDetail = () => {
                       'px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider',
                       apt.status === 'scheduled' ? 'bg-blue-100 text-blue-700' : apt.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',
                     )}>
-                      {apt.status === 'scheduled' ? 'Agendado' : apt.status === 'completed' ? 'ConcluÃ­do' : 'Cancelado'}
+                      {apt.status === 'scheduled' ? 'Agendado' : apt.status === 'completed' ? 'Concluído' : 'Cancelado'}
                     </div>
                   </div>
                 ))
@@ -1570,7 +1570,7 @@ const MonthDetails = ({ monthId, revenue }: { monthId: string; revenue: number }
   if (loading) return <div className="p-8 text-center text-brand-400 animate-pulse">Carregando detalhes...</div>;
 
   if (error || !details) {
-    return <div className="p-8 text-center text-sm font-medium text-red-700">{error ?? 'Erro ao carregar detalhes do mÃªs.'}</div>;
+    return <div className="p-8 text-center text-sm font-medium text-red-700">{error ?? 'Erro ao carregar detalhes do mês.'}</div>;
   }
 
   return (
@@ -1595,7 +1595,7 @@ const MonthDetails = ({ monthId, revenue }: { monthId: string; revenue: number }
       </div>
 
       <div className="space-y-3">
-        <h4 className="text-sm font-bold text-brand-700 uppercase tracking-widest">GrÃ¡fico de desempenho do mÃªs</h4>
+        <h4 className="text-sm font-bold text-brand-700 uppercase tracking-widest">Gráfico de desempenho do mês</h4>
         <div className="h-64 bg-white border border-brand-100 rounded-2xl p-4">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={details.dailyPerformance}>
@@ -1615,7 +1615,7 @@ const MonthDetails = ({ monthId, revenue }: { monthId: string; revenue: number }
         <h4 className="text-sm font-bold text-brand-700 uppercase tracking-widest">Faturamento por procedimento</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
           {details.byProcedure.length === 0 ? (
-            <p className="text-brand-400 italic text-sm">Nenhum atendimento concluÃ­do neste mÃªs.</p>
+            <p className="text-brand-400 italic text-sm">Nenhum atendimento concluído neste mês.</p>
           ) : (
             details.byProcedure.map((item, i) => {
               const progress = revenue > 0 ? (item.value / revenue) * 100 : 0;
@@ -1672,12 +1672,12 @@ const Finances = () => {
     };
   }, []);
 
-  if (!data && !error) return <div className="p-20 text-center">Carregando histÃ³rico financeiro...</div>;
+  if (!data && !error) return <div className="p-20 text-center">Carregando histórico financeiro...</div>;
 
   return (
     <div className="space-y-8">
       <header>
-        <h2 className="text-3xl sm:text-4xl font-serif font-bold text-brand-900">FinanÃ§as</h2>
+        <h2 className="text-3xl sm:text-4xl font-serif font-bold text-brand-900">Finanças</h2>
         <p className="text-brand-500">Acompanhe os meses de 2026 com foco em receitas, despesas e saldo.</p>
       </header>
 
@@ -1696,11 +1696,11 @@ const Finances = () => {
               <p className="text-4xl font-serif font-bold text-brand-800">{formatMoney(data.summary.caixaGeral)}</p>
             </div>
             <div className="glass-card p-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Atendimentos do mÃªs</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Atendimentos do mês</p>
               <p className="text-3xl font-serif font-bold text-brand-900">{data.summary.totalAtendimentosMes}</p>
             </div>
             <div className="glass-card p-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Faturamento do mÃªs</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Faturamento do mês</p>
               <p className="text-3xl font-serif font-bold text-green-700">{formatMoney(data.summary.faturamentoMes)}</p>
             </div>
           </div>
@@ -1715,7 +1715,7 @@ const Finances = () => {
               <p className="text-2xl font-serif font-bold text-red-700">{formatMoney(data.summary.totalDespesas)}</p>
             </div>
             <div className="glass-card p-5">
-              <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Saldo do mÃªs atual</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-brand-500">Saldo do mês atual</p>
               <p className="text-2xl font-serif font-bold text-green-700">{formatMoney(data.summary.saldoMes)}</p>
             </div>
           </div>
@@ -1737,7 +1737,7 @@ const Finances = () => {
                     <div>
                       <h3 className="text-xl font-serif font-bold text-brand-900 capitalize">{month.label}</h3>
                       <p className="text-sm text-brand-500 font-medium">
-                        Receita: {formatMoney(month.revenue)} â€¢ Despesas: {formatMoney(month.expenses)} â€¢ Saldo: {formatMoney(month.net)}
+                        Receita: {formatMoney(month.revenue)} • Despesas: {formatMoney(month.expenses)} • Saldo: {formatMoney(month.net)}
                       </p>
                     </div>
                   </div>
@@ -1862,7 +1862,7 @@ const Despesas = () => {
           <h3 className="text-xl font-serif font-bold">Nova despesa</h3>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-sm font-bold text-brand-700 mb-1">DescriÃ§Ã£o *</label>
+              <label className="block text-sm font-bold text-brand-700 mb-1">Descrição *</label>
               <input
                 required
                 type="text"
@@ -1937,13 +1937,13 @@ const Despesas = () => {
 
           <div className="space-y-3">
             {expenses.length === 0 ? (
-              <p className="text-brand-400 italic py-6 text-center">Nenhuma despesa para este mÃªs.</p>
+              <p className="text-brand-400 italic py-6 text-center">Nenhuma despesa para este mês.</p>
             ) : (
               expenses.map((expense) => (
                 <div key={expense.id} className="p-4 rounded-xl border border-brand-100 bg-brand-50/40 flex items-center justify-between gap-4">
                   <div>
                     <p className="font-bold text-brand-900">{expense.description}</p>
-                    <p className="text-xs text-brand-500">{expense.category || 'Sem categoria'} â€¢ {format(parseISO(expense.expense_date), 'dd/MM/yyyy')}</p>
+                    <p className="text-xs text-brand-500">{expense.category || 'Sem categoria'} • {format(parseISO(expense.expense_date), 'dd/MM/yyyy')}</p>
                     {expense.notes && <p className="text-xs text-brand-500 mt-1">{expense.notes}</p>}
                   </div>
                   <div className="text-right space-y-2">
