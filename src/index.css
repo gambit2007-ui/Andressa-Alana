@@ -5,21 +5,21 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
 
-  /* Tema preto + marrom */
-  --color-brand-50: #f6f0e9;
-  --color-brand-100: #e8dacc;
-  --color-brand-200: #d4baa3;
-  --color-brand-300: #bb9678;
-  --color-brand-400: #9a7356;
-  --color-brand-500: #7a533a;
-  --color-brand-600: #5f3d2a;
-  --color-brand-700: #40271b;
-  --color-brand-800: #25160f;
-  --color-brand-900: #0f0906;
+  /* Preto + marrom */
+  --color-brand-50: #070707;
+  --color-brand-100: #1a120d;
+  --color-brand-200: #2a1c14;
+  --color-brand-300: #3a271c;
+  --color-brand-400: #533526;
+  --color-brand-500: #6a4531;
+  --color-brand-600: #84563d;
+  --color-brand-700: #9f6a4b;
+  --color-brand-800: #c09071;
+  --color-brand-900: #ffffff;
 }
 
 body {
-  @apply bg-brand-50 text-brand-900 font-sans;
+  @apply bg-brand-50 text-white font-sans;
 }
 
 h1, h2, h3, h4, .serif {
@@ -27,5 +27,38 @@ h1, h2, h3, h4, .serif {
 }
 
 .glass-card {
-  @apply bg-white/75 backdrop-blur-md border border-brand-200/60 rounded-3xl shadow-sm shadow-brand-900/5;
+  @apply bg-brand-600/90 backdrop-blur-md border border-brand-400/70 rounded-3xl shadow-sm shadow-black/40;
+}
+
+/* Texto branco em toda a escala brand */
+.text-brand-900,
+.text-brand-800,
+.text-brand-700,
+.text-brand-600,
+.text-brand-500,
+.text-brand-400 {
+  color: #ffffff !important;
+}
+
+/* Superficies que estavam brancas agora viram marrom */
+.bg-white,
+.bg-white\/95,
+.bg-white\/80,
+.bg-white\/75,
+.bg-white\/50 {
+  background-color: rgba(106, 69, 49, 0.92) !important;
+}
+
+/* Campos e bordas mais consistentes no tema escuro */
+input,
+textarea,
+select {
+  color: #ffffff;
+  background-color: rgba(58, 39, 28, 0.85);
+  border-color: rgba(192, 144, 113, 0.45);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.72);
 }
