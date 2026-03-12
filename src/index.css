@@ -5,21 +5,21 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
 
-  /* Preto + marrom */
-  --color-brand-50: #070707;
-  --color-brand-100: #1a120d;
-  --color-brand-200: #2a1c14;
-  --color-brand-300: #3a271c;
-  --color-brand-400: #533526;
-  --color-brand-500: #6a4531;
-  --color-brand-600: #84563d;
-  --color-brand-700: #9f6a4b;
-  --color-brand-800: #c09071;
-  --color-brand-900: #ffffff;
+  /* Fundo cinza claro + escala rose gold */
+  --color-brand-50: #eef0f3;
+  --color-brand-100: #f6e6e8;
+  --color-brand-200: #e8c9cd;
+  --color-brand-300: #d6a7ae;
+  --color-brand-400: #c38993;
+  --color-brand-500: #b76e79;
+  --color-brand-600: #9f5e67;
+  --color-brand-700: #854c54;
+  --color-brand-800: #4b3539;
+  --color-brand-900: #111111;
 }
 
 body {
-  @apply bg-brand-50 text-white font-sans;
+  @apply bg-brand-50 text-brand-900 font-sans;
 }
 
 h1, h2, h3, h4, .serif {
@@ -27,38 +27,39 @@ h1, h2, h3, h4, .serif {
 }
 
 .glass-card {
-  @apply bg-brand-600/90 backdrop-blur-md border border-brand-400/70 rounded-3xl shadow-sm shadow-black/40;
+  @apply bg-brand-200/85 backdrop-blur-md border border-brand-300/70 rounded-3xl shadow-sm shadow-brand-700/10;
 }
 
-/* Texto branco em toda a escala brand */
+/* Texto preto em toda a escala brand */
 .text-brand-900,
 .text-brand-800,
 .text-brand-700,
 .text-brand-600,
 .text-brand-500,
-.text-brand-400 {
-  color: #ffffff !important;
+.text-brand-400,
+.text-white {
+  color: #111111 !important;
 }
 
-/* Superficies que estavam brancas agora viram marrom */
+/* Superfícies que estavam brancas viram rose gold */
 .bg-white,
 .bg-white\/95,
 .bg-white\/80,
 .bg-white\/75,
 .bg-white\/50 {
-  background-color: rgba(106, 69, 49, 0.92) !important;
+  background-color: rgba(183, 110, 121, 0.58) !important;
 }
 
-/* Campos e bordas mais consistentes no tema escuro */
+/* Campos com leitura confortável */
 input,
 textarea,
 select {
-  color: #ffffff;
-  background-color: rgba(58, 39, 28, 0.85);
-  border-color: rgba(192, 144, 113, 0.45);
+  color: #111111;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(183, 110, 121, 0.55);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(17, 17, 17, 0.58);
 }
