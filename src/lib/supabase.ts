@@ -17,8 +17,8 @@ export const isSupabaseConfigured = missingSupabaseEnv.length === 0;
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
-        // Mantem a sessao somente enquanto a aba estiver aberta.
-        persistSession: false,
+        // Mantem a sessao entre recarregamentos e renova o token automaticamente.
+        persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
