@@ -4,7 +4,7 @@ import { AlertTriangle, Inbox, LoaderCircle, X } from 'lucide-react';
 export function PageHeader({ eyebrow, title, description, action }: {
   eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   action?: ReactNode;
 }) {
   return (
@@ -12,7 +12,7 @@ export function PageHeader({ eyebrow, title, description, action }: {
       <div>
         {eyebrow && <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-cyan-700">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
-        <p className="page-subtitle max-w-2xl">{description}</p>
+        {description && <p className="page-subtitle max-w-2xl">{description}</p>}
       </div>
       {action}
     </header>

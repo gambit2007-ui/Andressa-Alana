@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, CloudCog, LockKeyhole, Play, RefreshCw, ShieldAlert, Smartphone } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CloudCog, LockKeyhole, Play, RefreshCw, Smartphone } from 'lucide-react';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
 import { invokeMdmCommand, listMdmCommands, listMdmDevices } from '../../repositories/rentalRepository';
@@ -52,9 +52,8 @@ export default function MdmPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Apple Business Manager" title="MDM e seguranca da frota" description="Arquitetura hibrida preparada para Mosyle. O provider atual e mock e cada comando permanece claramente identificado como simulado." />
+      <PageHeader eyebrow="Apple Business Manager" title="MDM e seguranca da frota" />
       {(devicesQuery.error || commandsQuery.error) && <ErrorState error={devicesQuery.error ?? commandsQuery.error} />}
-      <div className="alert border-amber-200 bg-amber-50 text-amber-900"><ShieldAlert className="mr-2 inline h-4 w-4" /><strong>Provider mock:</strong> nenhum iPhone real sera bloqueado, apagado ou removido do gerenciamento por esta tela.</div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {[
