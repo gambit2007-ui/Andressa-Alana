@@ -137,25 +137,41 @@ export async function listDevices(): Promise<Device[]> {
   return ((data ?? []) as unknown as Device[]).map(normalizeDevice);
 }
 
+const deviceWritePayload = (values: DeviceFormData) => ({
+  model: values.model,
+  color: values.color,
+  capacity_gb: values.capacity_gb,
+  imei_1: values.imei_1,
+  imei_2: values.imei_2 || null,
+  serial_number: values.serial_number.toUpperCase(),
+  battery_health: values.battery_health,
+  purchase_date: values.purchase_date,
+  purchase_amount: values.purchase_amount,
+  supplier: values.supplier || null,
+  invoice_number: values.invoice_number || null,
+  warranty_until: values.warranty_until || null,
+  condition: values.condition,
+  market_value: values.market_value,
+});
+
 export async function createDevice(organizationId: string, values: DeviceFormData): Promise<Device> {
   const { data, error } = await db().from('devices').insert({
     organization_id: organizationId,
-    model: values.model,
-    color: values.color,
-    capacity_gb: values.capacity_gb,
-    imei_1: values.imei_1,
-    imei_2: values.imei_2 || null,
-    serial_number: values.serial_number.toUpperCase(),
-    battery_health: values.battery_health,
-    purchase_date: values.purchase_date,
-    purchase_amount: values.purchase_amount,
-    supplier: values.supplier || null,
-    invoice_number: values.invoice_number || null,
-    warranty_until: values.warranty_until || null,
-    condition: values.condition,
-    market_value: values.market_value,
+    ...deviceWritePayload(values),
     status: 'available',
   }).select('*').single();
+  throwIfError(error);
+  return normalizeDevice(data as unknown as Device);
+}
+
+export async function updateDevice(organizationId: string, deviceId: string, values: DeviceFormData): Promise<Device> {
+  const { data, error } = await db()
+    .from('devices')
+    .update(deviceWritePayload(values))
+    .eq('organization_id', organizationId)
+    .eq('id', deviceId)
+    .select('*')
+    .single();
   throwIfError(error);
   return normalizeDevice(data as unknown as Device);
 }

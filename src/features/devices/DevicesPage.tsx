@@ -2,17 +2,34 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { BatteryCharging, Plus, Search, ShieldCheck, Smartphone, Wrench } from 'lucide-react';
+import { BatteryCharging, PencilLine, Plus, Save, Search, ShieldCheck, Smartphone, Wrench } from 'lucide-react';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
-import { createDevice, listDevices } from '../../repositories/rentalRepository';
+import { createDevice, listDevices, updateDevice } from '../../repositories/rentalRepository';
 import { deviceSchema, type DeviceFormData } from '../../schemas/forms';
-import type { DeviceStatus } from '../../types';
+import type { Device, DeviceStatus } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const statusLabel: Record<DeviceStatus, string> = { available: 'Disponivel', rented: 'Alugado', maintenance: 'Manutencao', sold: 'Vendido', retired: 'Retirado' };
 const statusTone: Record<DeviceStatus, string> = { available: 'bg-emerald-50 text-emerald-700', rented: 'bg-cyan-50 text-cyan-700', maintenance: 'bg-amber-50 text-amber-700', sold: 'bg-slate-100 text-slate-600', retired: 'bg-red-50 text-red-700' };
 const defaultValues: DeviceFormData = { model: '', color: '', capacity_gb: 128, imei_1: '', imei_2: '', serial_number: '', battery_health: 100, purchase_date: new Date().toISOString().slice(0, 10), purchase_amount: 0, supplier: '', invoice_number: '', warranty_until: '', condition: 'Excelente', market_value: 0 };
+
+const deviceFormValues = (device: Device): DeviceFormData => ({
+  model: device.model,
+  color: device.color,
+  capacity_gb: device.capacity_gb,
+  imei_1: device.imei_1,
+  imei_2: device.imei_2 ?? '',
+  serial_number: device.serial_number,
+  battery_health: device.battery_health,
+  purchase_date: device.purchase_date.slice(0, 10),
+  purchase_amount: device.purchase_amount,
+  supplier: device.supplier ?? '',
+  invoice_number: device.invoice_number ?? '',
+  warranty_until: device.warranty_until?.slice(0, 10) ?? '',
+  condition: device.condition,
+  market_value: device.market_value,
+});
 
 export default function DevicesPage() {
   const { profile } = useAuth();
@@ -20,12 +37,42 @@ export default function DevicesPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | DeviceStatus>('all');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const query = useQuery({ queryKey: ['devices'], queryFn: listDevices });
   const form = useForm<DeviceFormData>({ resolver: zodResolver(deviceSchema), defaultValues });
   const mutation = useMutation({
-    mutationFn: (values: DeviceFormData) => createDevice(profile.organization_id, values),
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['devices'] }); setModalOpen(false); form.reset(defaultValues); },
+    mutationFn: ({ values, deviceId }: { values: DeviceFormData; deviceId?: string }) => deviceId
+      ? updateDevice(profile.organization_id, deviceId, values)
+      : createDevice(profile.organization_id, values),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['devices'] });
+      setModalOpen(false);
+      setEditingDevice(null);
+      form.reset(defaultValues);
+    },
   });
+
+  const openCreateModal = () => {
+    mutation.reset();
+    setEditingDevice(null);
+    form.reset(defaultValues);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (device: Device) => {
+    mutation.reset();
+    setEditingDevice(device);
+    form.reset(deviceFormValues(device));
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (mutation.isPending) return;
+    setModalOpen(false);
+    setEditingDevice(null);
+    form.reset(defaultValues);
+    mutation.reset();
+  };
 
   const filtered = useMemo(() => (query.data ?? []).filter((device) => {
     const term = search.toLowerCase();
@@ -36,7 +83,7 @@ export default function DevicesPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Ativos e inventario" title="Frota de iPhones" action={profile.role !== 'viewer' ? <button className="btn-primary" type="button" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Novo aparelho</button> : undefined} />
+      <PageHeader eyebrow="Ativos e inventario" title="Frota de iPhones" action={profile.role !== 'viewer' ? <button className="btn-primary" type="button" onClick={openCreateModal}><Plus className="h-4 w-4" />Novo aparelho</button> : undefined} />
       {query.error && <ErrorState error={query.error} />}
       <div className="panel flex flex-col gap-3 p-3 md:flex-row">
         <div className="relative flex-1"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Modelo, cor, numero de serie ou IMEI" /></div>
@@ -63,6 +110,7 @@ export default function DevicesPage() {
                   <p className="flex items-center justify-between"><span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-cyan-700" />Apple Business / MDM</span><strong>{device.mdm_enrolled ? 'Inscrito' : 'Pendente'}</strong></p>
                 </div>
                 <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Comprado em {formatDate(device.purchase_date)} · {device.supplier || 'Fornecedor nao informado'}</p>
+                {profile.role !== 'viewer' && <button className="btn-secondary mt-4 w-full" type="button" onClick={() => openEditModal(device)}><PencilLine className="h-4 w-4" />Editar informacoes</button>}
               </div>
             </article>
           ))}
@@ -70,8 +118,8 @@ export default function DevicesPage() {
       )}
 
       {modalOpen && (
-        <Modal title="Cadastrar iPhone" description="IMEIs e serie devem ser unicos dentro da organizacao." onClose={() => setModalOpen(false)}>
-          <form className="space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+        <Modal title={editingDevice ? 'Editar iPhone' : 'Cadastrar iPhone'} description={editingDevice ? `${editingDevice.model} · SN ${editingDevice.serial_number}` : 'IMEIs e serie devem ser unicos dentro da organizacao.'} onClose={closeModal}>
+          <form className="space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate({ values, deviceId: editingDevice?.id }))}>
             {mutation.error && <ErrorState error={mutation.error} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-field"><span>Modelo *</span><input className="input" placeholder="iPhone 15 Pro Max" {...form.register('model')} /></label>
@@ -89,7 +137,7 @@ export default function DevicesPage() {
               <label className="form-field"><span>Nota fiscal</span><input className="input" {...form.register('invoice_number')} /></label>
               <label className="form-field sm:col-span-2"><span>Condicao</span><select className="input" {...form.register('condition')}><option>Excelente</option><option>Bom</option><option>Regular</option><option>Necessita manutencao</option></select></label>
             </div>
-            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={() => setModalOpen(false)}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit"><Smartphone className="h-4 w-4" />{mutation.isPending ? 'Salvando...' : 'Cadastrar aparelho'}</button></div>
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button className="btn-secondary" disabled={mutation.isPending} type="button" onClick={closeModal}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{editingDevice ? <Save className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}{mutation.isPending ? 'Salvando...' : editingDevice ? 'Salvar alteracoes' : 'Cadastrar aparelho'}</button></div>
           </form>
         </Modal>
       )}
