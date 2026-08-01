@@ -11,7 +11,7 @@ import type {
   MdmDevice,
   Payment,
 } from '../types';
-import type { ClientFormData, ContractFormData, DeviceFormData } from '../schemas/forms';
+import type { CashTransactionFormData, ClientFormData, ContractFormData, DeviceFormData } from '../schemas/forms';
 
 const db = () => {
   if (!supabase) throw new Error('Supabase nao configurado.');
@@ -223,6 +223,24 @@ export async function listCashTransactions(): Promise<CashTransaction[]> {
   const { data, error } = await db().from('cash_transactions').select('*').order('occurred_on', { ascending: false });
   throwIfError(error);
   return ((data ?? []) as unknown as CashTransaction[]).map((row) => ({ ...row, amount: toMoney(row.amount) }));
+}
+
+export async function createCashTransaction(
+  organizationId: string,
+  values: CashTransactionFormData,
+): Promise<CashTransaction> {
+  const { data, error } = await db().from('cash_transactions').insert({
+    organization_id: organizationId,
+    kind: values.kind,
+    direction: values.direction,
+    amount: values.amount,
+    occurred_on: values.occurred_on,
+    description: values.description,
+    status: 'confirmed',
+  }).select('*').single();
+  throwIfError(error);
+  const row = data as unknown as CashTransaction;
+  return { ...row, amount: toMoney(row.amount) };
 }
 
 export async function recordPayment(input: {

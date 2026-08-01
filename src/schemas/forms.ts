@@ -52,6 +52,15 @@ export const contractSchema = z.object({
   purchase_option_amount: money,
 });
 
+export const cashTransactionSchema = z.object({
+  direction: z.enum(['in', 'out']),
+  kind: requiredText('Categoria'),
+  amount: z.number().positive('O valor deve ser maior que zero.'),
+  occurred_on: requiredText('Data'),
+  description: requiredText('Descricao'),
+});
+
 export type ClientFormData = z.infer<typeof clientSchema>;
 export type DeviceFormData = z.infer<typeof deviceSchema>;
 export type ContractFormData = z.infer<typeof contractSchema>;
+export type CashTransactionFormData = z.infer<typeof cashTransactionSchema>;
