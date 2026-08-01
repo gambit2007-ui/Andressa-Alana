@@ -68,6 +68,18 @@ function BrandPanel() {
   );
 }
 
+function MobileBrand() {
+  return (
+    <div className="auth-mobile-brand">
+      <div className="brand-mark brand-mark-mobile"><span className="font-display text-sm">GR</span></div>
+      <div>
+        <p className="font-display text-xl leading-none text-slate-950">GR Solution</p>
+        <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.24em] text-gold-500">Rental</p>
+      </div>
+    </div>
+  );
+}
+
 function AuthForm({ onRecovery }: { onRecovery: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,6 +117,7 @@ function AuthForm({ onRecovery }: { onRecovery: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
+      <MobileBrand />
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-700">Area segura</p>
         <h2 className="mt-2 font-display text-4xl text-slate-950">
@@ -173,6 +186,7 @@ function PasswordRecovery({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={submit} className="w-full max-w-md space-y-6">
+      <MobileBrand />
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-700">Recuperacao</p>
         <h2 className="mt-2 font-display text-4xl text-slate-950">Crie uma nova senha</h2>

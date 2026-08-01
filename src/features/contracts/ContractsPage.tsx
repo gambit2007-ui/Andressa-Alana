@@ -65,7 +65,7 @@ export default function ContractsPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Locacao e ciclo contratual" title="Contratos" description="Vinculo atomico entre cliente, iPhone, caucao e cronograma de parcelas com vencimentos seguros ate o dia 31." action={<button className="btn-primary" disabled={!canCreate} type="button" onClick={() => setModalOpen(true)}><FilePlus2 className="h-4 w-4" />Novo contrato</button>} />
+      <PageHeader eyebrow="Locacao e ciclo contratual" title="Contratos" action={<button className="btn-primary" disabled={!canCreate} type="button" onClick={() => setModalOpen(true)}><FilePlus2 className="h-4 w-4" />Novo contrato</button>} />
       {(contractsQuery.error || clientsQuery.error || devicesQuery.error) && <ErrorState error={contractsQuery.error ?? clientsQuery.error ?? devicesQuery.error} />}
       {!canCreate && profile.role !== 'viewer' && <div className="alert border-amber-200 bg-amber-50 text-amber-800">Cadastre um cliente e mantenha ao menos um aparelho disponivel para abrir um contrato.</div>}
 

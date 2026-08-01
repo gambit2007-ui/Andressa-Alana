@@ -55,7 +55,7 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Cadastro e risco" title="Clientes" description="Dados cadastrais, classificacao interna e documentos privados para analise da locacao." action={canWrite ? <button className="btn-primary" type="button" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Novo cliente</button> : undefined} />
+      <PageHeader eyebrow="Cadastro e risco" title="Clientes" action={canWrite ? <button className="btn-primary" type="button" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Novo cliente</button> : undefined} />
       {clientsQuery.error && <ErrorState error={clientsQuery.error} />}
 
       <div className="panel p-3">

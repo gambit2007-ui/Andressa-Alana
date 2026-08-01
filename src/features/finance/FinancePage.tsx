@@ -58,7 +58,7 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Caixa, parcelas e cobranca" title="Financeiro" description="Receita reconhecida somente por pagamentos confirmados. Parcelas aceitam baixas parciais, integrais e estorno auditavel." action={<button className="btn-primary" type="button" disabled={billingMutation.isPending || !canReceive} onClick={() => billingMutation.mutate()}><Play className="h-4 w-4" />Executar regua mock</button>} />
+      <PageHeader eyebrow="Caixa, parcelas e cobranca" title="Financeiro" action={<button className="btn-primary" type="button" disabled={billingMutation.isPending || !canReceive} onClick={() => billingMutation.mutate()}><Play className="h-4 w-4" />Executar regua mock</button>} />
       {(query.error || billingMutation.error) && <ErrorState error={query.error ?? billingMutation.error} />}
       {billingMessage && <div className="alert border-cyan-200 bg-cyan-50 text-cyan-800">{billingMessage}</div>}
       <div className="grid gap-4 sm:grid-cols-3">

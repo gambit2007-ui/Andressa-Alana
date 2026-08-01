@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInMonths, parseISO } from 'date-fns';
-import { Award, BatteryWarning, Search, Smartphone, TrendingUp } from 'lucide-react';
+import { Award, BatteryWarning, Search, Smartphone } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '../../components/ui';
 import { calculateProfitability } from '../../domain/finance';
 import { listCashTransactions, listDevices, listInstallments } from '../../repositories/rentalRepository';
@@ -55,7 +55,7 @@ export default function ProfitabilityPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Economia por ativo" title="Rentabilidade da frota" description="Lucro operacional, ROI e payback separados. Valor de mercado e depreciacao sao indicadores auxiliares, nao receita realizada." action={<label className="form-field w-full sm:w-56"><span>Depreciacao estimada</span><select className="input" value={depreciationRate} onChange={(event) => setDepreciationRate(Number(event.target.value))}>{[10,15,20,25].map((rate) => <option key={rate} value={rate}>{rate}% ao ano</option>)}</select></label>} />
+      <PageHeader eyebrow="Economia por ativo" title="Rentabilidade da frota" action={<label className="form-field w-full sm:w-56"><span>Depreciacao estimada</span><select className="input" value={depreciationRate} onChange={(event) => setDepreciationRate(Number(event.target.value))}>{[10,15,20,25].map((rate) => <option key={rate} value={rate}>{rate}% ao ano</option>)}</select></label>} />
       {query.error && <ErrorState error={query.error} />}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -83,7 +83,6 @@ export default function ProfitabilityPage() {
           ))}
         </div>
       )}
-      <div className="alert border-slate-200 bg-white text-slate-600"><TrendingUp className="mr-2 inline h-4 w-4 text-cyan-700" />Formula: alugueis + venda - compra - manutencao - MDM - seguro - taxas - impostos - demais despesas. Valor de mercado nao entra no lucro realizado.</div>
     </div>
   );
 }

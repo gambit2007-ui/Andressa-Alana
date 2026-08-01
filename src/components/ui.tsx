@@ -8,13 +8,13 @@ export function PageHeader({ eyebrow, title, description, action }: {
   action?: ReactNode;
 }) {
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        {eyebrow && <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-cyan-700">{eyebrow}</p>}
+    <header className="page-header">
+      <div className="min-w-0">
+        {eyebrow && <p className="page-eyebrow">{eyebrow}</p>}
         <h1 className="page-title">{title}</h1>
         {description && <p className="page-subtitle max-w-2xl">{description}</p>}
       </div>
-      {action}
+      {action && <div className="page-header-action">{action}</div>}
     </header>
   );
 }
@@ -28,12 +28,12 @@ export function Modal({ title, description, children, onClose }: {
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-card">
-        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4 sm:px-7">
+        <div className="flex items-start justify-between border-b border-slate-200/80 px-5 py-4 sm:px-7 sm:py-5">
           <div>
             <h2 className="font-display text-2xl text-slate-950">{title}</h2>
             {description && <p className="mt-1 text-xs text-slate-500">{description}</p>}
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-200"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-200"><X className="h-5 w-5" /></button>
         </div>
         <div className="max-h-[78vh] overflow-y-auto p-5 sm:p-7">{children}</div>
       </div>

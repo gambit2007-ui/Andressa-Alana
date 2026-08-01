@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { PageHeader, ErrorState, LoadingState } from '../../components/ui';
 import { listCashTransactions, listContracts, listDevices, listInstallments, listPayments } from '../../repositories/rentalRepository';
-import { formatCurrency, formatMonthLabel, monthKey } from '../../utils/formatters';
+import { formatCurrency, monthKey } from '../../utils/formatters';
 
 export default function DashboardPage() {
   const [selectedMonth, setSelectedMonth] = useState(monthKey());
@@ -88,7 +88,6 @@ export default function DashboardPage() {
       <PageHeader
         eyebrow="Comando executivo"
         title="Visao geral da operacao"
-        description={`Competencia ${formatMonthLabel(selectedMonth)}. Indicadores calculados a partir de contratos, parcelas, pagamentos e despesas confirmadas.`}
         action={<label className="form-field w-full sm:w-auto"><span>Competencia</span><input className="input" type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>}
       />
 

@@ -36,7 +36,7 @@ export default function DevicesPage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Ativos e inventario" title="Frota de iPhones" description="Rastreabilidade por IMEI, serie, compra, condicao, valor de mercado e prontidao MDM." action={profile.role !== 'viewer' ? <button className="btn-primary" type="button" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Novo aparelho</button> : undefined} />
+      <PageHeader eyebrow="Ativos e inventario" title="Frota de iPhones" action={profile.role !== 'viewer' ? <button className="btn-primary" type="button" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Novo aparelho</button> : undefined} />
       {query.error && <ErrorState error={query.error} />}
       <div className="panel flex flex-col gap-3 p-3 md:flex-row">
         <div className="relative flex-1"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Modelo, cor, numero de serie ou IMEI" /></div>
