@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Banknote, CheckCircle2, Clock3, Play, Search, WalletCards } from 'lucide-react';
+import { AlertCircle, Banknote, CheckCircle2, Clock3, Search } from 'lucide-react';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
-import { listInstallments, recordPayment, runBilling } from '../../repositories/rentalRepository';
+import { listInstallments, recordPayment } from '../../repositories/rentalRepository';
 import type { Installment, InstallmentStatus } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -21,7 +21,6 @@ export default function FinancePage() {
   const [selected, setSelected] = useState<Installment | null>(null);
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState('pix');
-  const [billingMessage, setBillingMessage] = useState<string | null>(null);
   const query = useQuery({ queryKey: ['installments'], queryFn: listInstallments });
 
   const paymentMutation = useMutation({
@@ -34,11 +33,6 @@ export default function FinancePage() {
       setSelected(null);
     },
   });
-  const billingMutation = useMutation({
-    mutationFn: runBilling,
-    onSuccess: (result) => { setBillingMessage(`${result.message} ${result.simulated} notificacoes registradas como simuladas.`); },
-  });
-
   const filtered = useMemo(() => (query.data ?? []).filter((item) => {
     const term = search.toLowerCase();
     return (status === 'all' || item.status === status) && `${item.contract?.client?.full_name ?? ''} ${item.contract?.contract_number ?? ''} ${item.contract?.device?.model ?? ''}`.toLowerCase().includes(term);
@@ -58,9 +52,8 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Caixa, parcelas e cobranca" title="Financeiro" action={<button className="btn-primary" type="button" disabled={billingMutation.isPending || !canReceive} onClick={() => billingMutation.mutate()}><Play className="h-4 w-4" />Executar regua mock</button>} />
-      {(query.error || billingMutation.error) && <ErrorState error={query.error ?? billingMutation.error} />}
-      {billingMessage && <div className="alert border-cyan-200 bg-cyan-50 text-cyan-800">{billingMessage}</div>}
+      <PageHeader eyebrow="Caixa, parcelas e cobranca" title="Financeiro" />
+      {query.error && <ErrorState error={query.error} />}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           { label: 'Total recebido', value: stats.received, icon: CheckCircle2, tone: 'text-emerald-600 bg-emerald-50' },
@@ -68,10 +61,6 @@ export default function FinancePage() {
           { label: 'Saldo em atraso', value: stats.overdue, icon: AlertCircle, tone: 'text-red-600 bg-red-50' },
         ].map((item) => <article key={item.label} className="metric-card flex items-center gap-4"><div className={`grid h-11 w-11 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></div><div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p><p className="mt-1 text-xl font-extrabold text-slate-950">{formatCurrency(item.value)}</p></div></article>)}
       </div>
-
-      <section className="panel-dark p-5 sm:p-6">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><p className="text-xs font-extrabold uppercase tracking-[0.2em] text-cyan-300">Provider de cobranca: mock</p><h2 className="mt-1 font-display text-2xl">WhatsApp, email e Pix simulados</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-slate-400">A execucao registra notificacoes para auditoria, mas nao envia mensagens nem gera Pix real ate que um gateway seja configurado.</p></div><WalletCards className="h-8 w-8 shrink-0 text-cyan-300" /></div>
-      </section>
 
       <div className="panel flex flex-col gap-3 p-3 md:flex-row"><div className="relative flex-1"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cliente, contrato ou aparelho" /></div><select className="input md:w-48" value={status} onChange={(event) => setStatus(event.target.value as 'all' | InstallmentStatus)}><option value="all">Todos os status</option>{Object.entries(statusLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div>
 
