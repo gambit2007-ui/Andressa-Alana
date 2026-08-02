@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const statusLabel: Record<DeviceStatus, string> = { available: 'Disponivel', rented: 'Alugado', maintenance: 'Manutencao', sold: 'Vendido', retired: 'Retirado' };
 const statusTone: Record<DeviceStatus, string> = { available: 'bg-emerald-50 text-emerald-700', rented: 'bg-cyan-50 text-cyan-700', maintenance: 'bg-amber-50 text-amber-700', sold: 'bg-slate-100 text-slate-600', retired: 'bg-red-50 text-red-700' };
-const defaultValues: DeviceFormData = { model: '', color: '', capacity_gb: 128, imei_1: '', imei_2: '', serial_number: '', battery_health: 100, purchase_date: new Date().toISOString().slice(0, 10), purchase_amount: 0, supplier: '', invoice_number: '', warranty_until: '', condition: 'Excelente', market_value: 0 };
+const defaultValues: DeviceFormData = { model: '', color: '', capacity_gb: 128, imei_1: '', imei_2: '', serial_number: '', battery_health: 100, purchase_date: new Date().toISOString().slice(0, 10), purchase_amount: 0, supplier: '', invoice_number: '', warranty_until: '', condition: 'Excelente', market_value: 0, mdm_enrolled: false };
 
 const deviceFormValues = (device: Device): DeviceFormData => ({
   model: device.model,
@@ -29,6 +29,7 @@ const deviceFormValues = (device: Device): DeviceFormData => ({
   warranty_until: device.warranty_until?.slice(0, 10) ?? '',
   condition: device.condition,
   market_value: device.market_value,
+  mdm_enrolled: device.mdm_enrolled,
 });
 
 export default function DevicesPage() {
@@ -45,7 +46,10 @@ export default function DevicesPage() {
       ? updateDevice(profile.organization_id, deviceId, values)
       : createDevice(profile.organization_id, values),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['devices'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['devices'] }),
+        queryClient.invalidateQueries({ queryKey: ['mdm-devices'] }),
+      ]);
       setModalOpen(false);
       setEditingDevice(null);
       form.reset(defaultValues);
@@ -107,7 +111,7 @@ export default function DevicesPage() {
                 <div className="mt-4 space-y-2.5 text-xs text-slate-600">
                   <p className="flex items-center justify-between"><span className="flex items-center gap-2"><BatteryCharging className={`h-4 w-4 ${device.battery_health < 85 ? 'text-red-500' : 'text-emerald-600'}`} />Saude da bateria</span><strong>{device.battery_health}%</strong></p>
                   <p className="flex items-center justify-between"><span className="flex items-center gap-2"><Wrench className="h-4 w-4 text-slate-400" />Condicao</span><strong>{device.condition}</strong></p>
-                  <p className="flex items-center justify-between"><span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-cyan-700" />Apple Business / MDM</span><strong>{device.mdm_enrolled ? 'Inscrito' : 'Pendente'}</strong></p>
+                  <p className="flex items-center justify-between"><span className="flex items-center gap-2"><ShieldCheck className={`h-4 w-4 ${device.mdm_enrolled ? 'text-emerald-600' : 'text-slate-400'}`} />Apple Business / MDM</span><strong className={device.mdm_enrolled ? 'text-emerald-700' : 'text-slate-500'}>{device.mdm_enrolled ? 'Ativo' : 'Desativado'}</strong></p>
                 </div>
                 <p className="mt-4 border-t border-slate-100 pt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Comprado em {formatDate(device.purchase_date)} · {device.supplier || 'Fornecedor nao informado'}</p>
                 {profile.role !== 'viewer' && <button className="btn-secondary mt-4 w-full" type="button" onClick={() => openEditModal(device)}><PencilLine className="h-4 w-4" />Editar informacoes</button>}
@@ -136,6 +140,7 @@ export default function DevicesPage() {
               <label className="form-field"><span>Fornecedor</span><input className="input" {...form.register('supplier')} /></label>
               <label className="form-field"><span>Nota fiscal</span><input className="input" {...form.register('invoice_number')} /></label>
               <label className="form-field sm:col-span-2"><span>Condicao</span><select className="input" {...form.register('condition')}><option>Excelente</option><option>Bom</option><option>Regular</option><option>Necessita manutencao</option></select></label>
+              <label className="form-field sm:col-span-2"><span>Apple Business / MDM</span><select className="input" {...form.register('mdm_enrolled', { setValueAs: (value) => value === 'true' })}><option value="false">Desativado</option><option value="true">Ativo</option></select></label>
             </div>
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button className="btn-secondary" disabled={mutation.isPending} type="button" onClick={closeModal}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{editingDevice ? <Save className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}{mutation.isPending ? 'Salvando...' : editingDevice ? 'Salvar alteracoes' : 'Cadastrar aparelho'}</button></div>
           </form>

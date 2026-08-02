@@ -161,7 +161,7 @@ export type MdmDevice = {
   supervised: boolean;
   activation_lock_managed: boolean;
   last_sync_at: string | null;
-  device?: Pick<Device, 'id' | 'model' | 'serial_number'>;
+  device?: Pick<Device, 'id' | 'model' | 'serial_number' | 'apple_business_registered' | 'mdm_enrolled'>;
 };
 
 export type MdmCommandStatus =

@@ -65,17 +65,20 @@ export default function MdmPage() {
 
       {(devicesQuery.data?.length ?? 0) === 0 ? <EmptyState title="Nenhum aparelho vinculado ao MDM" description="O cadastro de um iPhone cria o registro MDM mock automaticamente." /> : (
         <div className="grid gap-5 xl:grid-cols-2">
-          {devicesQuery.data?.map((item) => (
-            <article key={item.id} className="panel p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-700">{item.provider.toUpperCase()}</p><h2 className="mt-1 font-bold text-slate-950">{item.device?.model}</h2><p className="mt-1 font-mono text-[10px] text-slate-400">SN {item.device?.serial_number}</p></div><span className="status-pill bg-cyan-50 text-cyan-700">{item.status}</span></div>
-              <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                {[
-                  ['Cadastrado no ABM', true], ['Atribuido a MDM', Boolean(item.provider_device_id)], ['Inscrito', item.status === 'enrolled'], ['Supervisionado', item.supervised], ['Activation Lock gerenciado', item.activation_lock_managed], ['Pronto para locacao', item.supervised && item.activation_lock_managed],
-                ].map(([label, checked]) => <div key={String(label)} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className={`h-2 w-2 rounded-full ${checked ? 'bg-emerald-500' : 'bg-amber-400'}`} /><span className="text-slate-600">{label}</span></div>)}
-              </div>
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"><p className="text-[10px] text-slate-400">Ultimo sync: {item.last_sync_at ? formatDate(item.last_sync_at) : 'nunca'}</p>{canCommand && <button className="btn-primary min-h-9 px-3 py-1.5 text-xs" type="button" onClick={() => { setSelected(item); setCommand('sync'); }}>Comando mock</button>}</div>
-            </article>
-          ))}
+          {devicesQuery.data?.map((item) => {
+            const isActive = Boolean(item.device?.mdm_enrolled);
+            return (
+              <article key={item.id} className="panel p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-700">{item.provider.toUpperCase()}</p><h2 className="mt-1 font-bold text-slate-950">{item.device?.model}</h2><p className="mt-1 font-mono text-[10px] text-slate-400">SN {item.device?.serial_number}</p></div><span className={`status-pill ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{isActive ? 'Ativo' : 'Desativado'}</span></div>
+                <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    ['Cadastrado no ABM', Boolean(item.device?.apple_business_registered)], ['Atribuido a MDM', isActive], ['Inscrito', isActive], ['Supervisionado', item.supervised], ['Activation Lock gerenciado', item.activation_lock_managed], ['Pronto para locacao', item.supervised && item.activation_lock_managed],
+                  ].map(([label, checked]) => <div key={String(label)} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3"><span className={`h-2 w-2 rounded-full ${checked ? 'bg-emerald-500' : 'bg-amber-400'}`} /><span className="text-slate-600">{label}</span></div>)}
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"><p className="text-[10px] text-slate-400">Ultimo sync: {item.last_sync_at ? formatDate(item.last_sync_at) : 'nunca'}</p>{canCommand && <button className="btn-primary min-h-9 px-3 py-1.5 text-xs" type="button" onClick={() => { setSelected(item); setCommand('sync'); }}>Comando mock</button>}</div>
+              </article>
+            );
+          })}
         </div>
       )}
 

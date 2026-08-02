@@ -36,6 +36,7 @@ export const deviceSchema = z.object({
   warranty_until: z.string().optional(),
   condition: requiredText('Condicao'),
   market_value: money,
+  mdm_enrolled: z.boolean(),
 });
 
 export const contractSchema = z.object({

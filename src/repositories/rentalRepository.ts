@@ -152,6 +152,8 @@ const deviceWritePayload = (values: DeviceFormData) => ({
   warranty_until: values.warranty_until || null,
   condition: values.condition,
   market_value: values.market_value,
+  apple_business_registered: values.mdm_enrolled,
+  mdm_enrolled: values.mdm_enrolled,
 });
 
 export async function createDevice(organizationId: string, values: DeviceFormData): Promise<Device> {
@@ -264,7 +266,7 @@ export async function recordPayment(input: {
 export async function listMdmDevices(): Promise<MdmDevice[]> {
   const { data, error } = await db()
     .from('mdm_devices')
-    .select('*,device:devices(id,model,serial_number)')
+    .select('*,device:devices(id,model,serial_number,apple_business_registered,mdm_enrolled)')
     .order('created_at', { ascending: false });
   throwIfError(error);
   return (data ?? []) as unknown as MdmDevice[];
