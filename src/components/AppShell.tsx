@@ -36,8 +36,6 @@ const navigation = [
   { to: '/audit', label: 'Auditoria', icon: ClipboardList },
 ] as const;
 
-const mobileNavigation = navigation.filter((item) => ['/', '/devices', '/clients', '/finance'].includes(item.to));
-
 function SidebarContent({ close }: { close?: () => void }) {
   const { profile, signOut } = useAuth();
   const organizationName = profile.organization?.name ?? 'GR Solution';
@@ -104,9 +102,6 @@ export default function AppShell() {
   const currentSection = navigation.find((item) => item.to === '/'
     ? location.pathname === '/'
     : location.pathname.startsWith(item.to));
-  const secondaryActive = !mobileNavigation.some((item) => item.to === '/'
-    ? location.pathname === '/'
-    : location.pathname.startsWith(item.to));
 
   return (
     <div className="min-h-screen">
@@ -152,7 +147,7 @@ export default function AppShell() {
         )}
       </AnimatePresence>
 
-      <main className="min-h-screen pb-24 lg:ml-72 lg:pb-0">
+      <main className="min-h-screen lg:ml-72">
         <div className="mx-auto w-full max-w-[1520px] px-4 py-5 sm:px-6 sm:py-7 lg:p-9 xl:p-11">
           <motion.div
             key={location.pathname}
@@ -166,23 +161,6 @@ export default function AppShell() {
         </div>
       </main>
 
-      <nav className="mobile-nav lg:hidden" aria-label="Atalhos principais">
-        {mobileNavigation.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) => `mobile-nav-link ${isActive ? 'is-active' : ''}`}
-          >
-            <item.icon className="h-5 w-5" />
-            <span>{item.to === '/' ? 'Inicio' : item.label === 'Frota de iPhones' ? 'Frota' : item.label}</span>
-          </NavLink>
-        ))}
-        <button type="button" onClick={() => setMenuOpen(true)} className={`mobile-nav-link ${secondaryActive ? 'is-active' : ''}`}>
-          <Menu className="h-5 w-5" />
-          <span>Menu</span>
-        </button>
-      </nav>
     </div>
   );
 }

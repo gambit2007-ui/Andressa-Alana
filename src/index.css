@@ -130,32 +130,6 @@ button:disabled { cursor: not-allowed; }
   box-shadow: 0 10px 32px rgba(7, 16, 31, 0.04);
 }
 
-.mobile-nav {
-  position: fixed;
-  right: 0.75rem;
-  bottom: max(0.7rem, env(safe-area-inset-bottom));
-  left: 0.75rem;
-  z-index: 35;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  min-height: 4.25rem;
-  padding: 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 1.35rem;
-  background: rgba(7, 16, 31, 0.95);
-  box-shadow: 0 20px 50px rgba(7, 16, 31, 0.3);
-  backdrop-filter: blur(20px);
-}
-
-.mobile-nav-link {
-  @apply flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-[9px] font-bold text-slate-400 transition;
-}
-
-.mobile-nav-link.is-active {
-  color: #f3dfb5;
-  background: rgba(207, 166, 95, 0.12);
-}
-
 .panel {
   @apply border bg-white/90 shadow-sm backdrop-blur;
   position: relative;
