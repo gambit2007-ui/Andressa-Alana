@@ -22,6 +22,12 @@ describe('cronograma de parcelas', () => {
     expect(schedule[0]).toEqual({ installmentNumber: 1, dueDate: '2024-02-29', amount: 699.9 });
     expect(schedule[1]?.dueDate).toBe('2024-03-31');
   });
+
+  it('aceita prazo personalizado fora das opcoes comerciais comuns', () => {
+    const schedule = generateInstallmentSchedule({ startDate: '2026-08-03', dueDay: 10, termMonths: 7, monthlyAmount: 450 });
+    expect(schedule).toHaveLength(7);
+    expect(schedule[6]).toEqual({ installmentNumber: 7, dueDate: '2027-03-10', amount: 450 });
+  });
 });
 
 describe('encargos e pagamentos', () => {
