@@ -36,7 +36,7 @@ export default function DashboardPage() {
       .filter((item) => item.status === 'confirmed' && item.paid_at.startsWith(selectedMonth))
       .reduce((sum, item) => sum + item.amount, 0);
     const expenses = data.transactions
-      .filter((item) => item.status === 'confirmed' && item.direction === 'out' && item.occurred_on.startsWith(selectedMonth))
+      .filter((item) => item.status === 'confirmed' && item.direction === 'out' && item.kind !== 'payment_reversal' && item.occurred_on.startsWith(selectedMonth))
       .reduce((sum, item) => sum + item.amount, 0);
     const expected = monthInstallments.reduce((sum, item) => sum + item.original_amount - item.discount_amount, 0);
     const open = monthInstallments

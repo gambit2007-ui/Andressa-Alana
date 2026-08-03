@@ -7,10 +7,15 @@ import {
   ArrowUpFromLine,
   Banknote,
   CheckCircle2,
+  ChevronDown,
   Clock3,
+  History,
   Plus,
+  RotateCcw,
   Scale,
   Search,
+  Smartphone,
+  UserRound,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../AuthGate';
@@ -19,10 +24,12 @@ import {
   createCashTransaction,
   listCashTransactions,
   listInstallments,
-  recordPayment,
+  listPayments,
+  recordClientPayment,
+  reversePayment,
 } from '../../repositories/rentalRepository';
 import { cashTransactionSchema, type CashTransactionFormData } from '../../schemas/forms';
-import type { Installment, InstallmentStatus } from '../../types';
+import type { Installment, InstallmentStatus, Payment } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const statusLabel: Record<InstallmentStatus, string> = {
@@ -41,6 +48,14 @@ const statusTone: Record<InstallmentStatus, string> = {
   paid: 'bg-emerald-50 text-emerald-700',
   cancelled: 'bg-slate-100 text-slate-500',
   renegotiated: 'bg-violet-50 text-violet-700',
+};
+
+const paymentMethodLabel: Record<string, string> = {
+  pix: 'Pix',
+  card: 'Cartao',
+  transfer: 'Transferencia',
+  cash: 'Dinheiro',
+  other: 'Outros',
 };
 
 const entryCategories = [
@@ -66,11 +81,12 @@ const defaultCategory: Record<'in' | 'out', string> = {
 const categoryLabel = Object.fromEntries([
   ...entryCategories,
   ...withdrawalCategories,
-  { value: 'rental_payment', label: 'Recebimento de parcela' },
+  { value: 'rental_payment', label: 'Recebimento de locacao' },
+  { value: 'payment_reversal', label: 'Estorno de recebimento' },
 ].map((item) => [item.value, item.label]));
 
 const dueTotal = (item: Installment) => item.original_amount + item.late_fee_amount + item.interest_amount - item.discount_amount;
-const balance = (item: Installment) => Math.max(0, dueTotal(item) - item.paid_amount);
+const installmentBalance = (item: Installment) => Math.max(0, dueTotal(item) - item.paid_amount);
 
 const today = () => {
   const date = new Date();
@@ -86,6 +102,96 @@ const cashDefaults = (): CashTransactionFormData => ({
   description: '',
 });
 
+type ClientFinanceGroup = {
+  clientId: string;
+  name: string;
+  cpf: string;
+  installments: Installment[];
+  contractNumbers: string[];
+  devices: string[];
+  totalDue: number;
+  paid: number;
+  balance: number;
+  overdue: number;
+  nextDue: Installment | null;
+};
+
+type PaymentReceipt = {
+  key: string;
+  clientId: string;
+  paymentId: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  status: 'confirmed' | 'reversed';
+  externalReference: string | null;
+  notes: string | null;
+  reversalReason: string | null;
+};
+
+const buildClientGroups = (installments: Installment[]): ClientFinanceGroup[] => {
+  const grouped = new Map<string, { name: string; cpf: string; installments: Installment[] }>();
+
+  installments.forEach((installment) => {
+    const client = installment.contract?.client;
+    if (!client) return;
+    const current = grouped.get(client.id) ?? { name: client.full_name, cpf: client.cpf, installments: [] };
+    current.installments.push(installment);
+    grouped.set(client.id, current);
+  });
+
+  return Array.from(grouped.entries()).map(([clientId, group]) => {
+    const ordered = [...group.installments].sort((left, right) => left.due_date.localeCompare(right.due_date));
+    const openInstallments = ordered.filter((item) => installmentBalance(item) > 0 && ['pending', 'partial', 'overdue'].includes(item.status));
+    return {
+      clientId,
+      name: group.name,
+      cpf: group.cpf,
+      installments: ordered,
+      contractNumbers: Array.from(new Set(ordered.map((item) => item.contract?.contract_number).filter(Boolean) as string[])),
+      devices: Array.from(new Set(ordered.map((item) => item.contract?.device?.model).filter(Boolean) as string[])),
+      totalDue: ordered.reduce((sum, item) => sum + dueTotal(item), 0),
+      paid: ordered.reduce((sum, item) => sum + item.paid_amount, 0),
+      balance: openInstallments.reduce((sum, item) => sum + installmentBalance(item), 0),
+      overdue: openInstallments.filter((item) => item.status === 'overdue').reduce((sum, item) => sum + installmentBalance(item), 0),
+      nextDue: openInstallments[0] ?? null,
+    };
+  }).sort((left, right) => left.name.localeCompare(right.name));
+};
+
+const buildReceipts = (payments: Payment[]): PaymentReceipt[] => {
+  const receipts = new Map<string, PaymentReceipt>();
+
+  payments.forEach((payment) => {
+    const clientId = payment.installment?.contract?.client_id;
+    if (!clientId) return;
+    const groupedReference = payment.external_reference?.startsWith('client_payment:') ? payment.external_reference : null;
+    const key = groupedReference ?? payment.id;
+    const current = receipts.get(key);
+
+    if (current) {
+      current.amount += payment.amount;
+      if (payment.status === 'confirmed') current.status = 'confirmed';
+      return;
+    }
+
+    receipts.set(key, {
+      key,
+      clientId,
+      paymentId: payment.id,
+      amount: payment.amount,
+      method: payment.method,
+      paidAt: payment.paid_at,
+      status: payment.status,
+      externalReference: payment.external_reference,
+      notes: payment.notes,
+      reversalReason: payment.reversal_reason,
+    });
+  });
+
+  return Array.from(receipts.values()).sort((left, right) => right.paidAt.localeCompare(left.paidAt));
+};
+
 export default function FinancePage() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -93,10 +199,15 @@ export default function FinancePage() {
   const [status, setStatus] = useState<'all' | InstallmentStatus>('all');
   const [cashFilter, setCashFilter] = useState<'all' | 'in' | 'out'>('all');
   const [cashModalOpen, setCashModalOpen] = useState(false);
-  const [selected, setSelected] = useState<Installment | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClientFinanceGroup | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
   const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState('pix');
+  const [paymentDate, setPaymentDate] = useState(today());
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [reversalReason, setReversalReason] = useState('');
   const installmentsQuery = useQuery({ queryKey: ['installments'], queryFn: listInstallments });
+  const paymentsQuery = useQuery({ queryKey: ['payments'], queryFn: listPayments });
   const cashQuery = useQuery({ queryKey: ['cash-transactions'], queryFn: listCashTransactions });
   const cashForm = useForm<CashTransactionFormData>({
     resolver: zodResolver(cashTransactionSchema),
@@ -104,51 +215,67 @@ export default function FinancePage() {
   });
   const cashDirection = cashForm.watch('direction');
 
+  const refreshFinance = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['installments'] }),
+      queryClient.invalidateQueries({ queryKey: ['payments'] }),
+      queryClient.invalidateQueries({ queryKey: ['cash-transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['rental-overview'] }),
+      queryClient.invalidateQueries({ queryKey: ['profitability'] }),
+    ]);
+  };
+
   const paymentMutation = useMutation({
-    mutationFn: () => recordPayment({
-      installmentId: selected!.id,
+    mutationFn: () => recordClientPayment({
+      clientId: selectedClient!.clientId,
       amount,
       method,
-      paidAt: new Date().toISOString(),
-      notes: 'Baixa manual pelo painel',
+      paidAt: new Date(`${paymentDate}T12:00:00`).toISOString(),
+      notes: paymentNotes,
     }),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['installments'] }),
-        queryClient.invalidateQueries({ queryKey: ['cash-transactions'] }),
-        queryClient.invalidateQueries({ queryKey: ['rental-overview'] }),
-      ]);
-      setSelected(null);
+      await refreshFinance();
+      setSelectedClient(null);
+    },
+  });
+
+  const reversalMutation = useMutation({
+    mutationFn: () => reversePayment(selectedReceipt!.paymentId, reversalReason),
+    onSuccess: async () => {
+      await refreshFinance();
+      setSelectedReceipt(null);
+      setReversalReason('');
     },
   });
 
   const cashMutation = useMutation({
     mutationFn: (values: CashTransactionFormData) => createCashTransaction(profile.organization_id, values),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['cash-transactions'] }),
-        queryClient.invalidateQueries({ queryKey: ['rental-overview'] }),
-        queryClient.invalidateQueries({ queryKey: ['profitability'] }),
-      ]);
+      await refreshFinance();
       cashForm.reset(cashDefaults());
       setCashModalOpen(false);
     },
   });
 
-  const filtered = useMemo(() => (installmentsQuery.data ?? []).filter((item) => {
-    const term = search.toLowerCase();
-    const searchable = `${item.contract?.client?.full_name ?? ''} ${item.contract?.contract_number ?? ''} ${item.contract?.device?.model ?? ''}`;
-    return (status === 'all' || item.status === status) && searchable.toLowerCase().includes(term);
-  }), [installmentsQuery.data, search, status]);
+  const clientGroups = useMemo(() => buildClientGroups(installmentsQuery.data ?? []), [installmentsQuery.data]);
+  const receipts = useMemo(() => buildReceipts(paymentsQuery.data ?? []), [paymentsQuery.data]);
+  const receiptsByClient = useMemo(() => {
+    const grouped = new Map<string, PaymentReceipt[]>();
+    receipts.forEach((receipt) => grouped.set(receipt.clientId, [...(grouped.get(receipt.clientId) ?? []), receipt]));
+    return grouped;
+  }, [receipts]);
 
-  const stats = useMemo(() => {
-    const rows = installmentsQuery.data ?? [];
-    return {
-      received: rows.reduce((sum, item) => sum + item.paid_amount, 0),
-      open: rows.filter((item) => ['pending', 'partial'].includes(item.status)).reduce((sum, item) => sum + balance(item), 0),
-      overdue: rows.filter((item) => item.status === 'overdue').reduce((sum, item) => sum + balance(item), 0),
-    };
-  }, [installmentsQuery.data]);
+  const filteredClients = useMemo(() => clientGroups.filter((group) => {
+    const searchable = `${group.name} ${group.cpf} ${group.contractNumbers.join(' ')} ${group.devices.join(' ')}`.toLowerCase();
+    const matchesStatus = status === 'all' || group.installments.some((item) => item.status === status);
+    return matchesStatus && searchable.includes(search.toLowerCase());
+  }), [clientGroups, search, status]);
+
+  const stats = useMemo(() => ({
+    received: clientGroups.reduce((sum, group) => sum + group.paid, 0),
+    open: clientGroups.reduce((sum, group) => sum + group.balance - group.overdue, 0),
+    overdue: clientGroups.reduce((sum, group) => sum + group.overdue, 0),
+  }), [clientGroups]);
 
   const cashStats = useMemo(() => {
     const rows = (cashQuery.data ?? []).filter((item) => item.status === 'confirmed');
@@ -159,7 +286,7 @@ export default function FinancePage() {
 
   const cashRows = useMemo(() => (cashQuery.data ?? []).filter((item) => cashFilter === 'all' || item.direction === cashFilter), [cashFilter, cashQuery.data]);
 
-  if (installmentsQuery.isLoading || cashQuery.isLoading) return <LoadingState />;
+  if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading) return <LoadingState />;
   const canManageFinance = ['admin', 'manager', 'finance'].includes(profile.role);
   const categories = cashDirection === 'in' ? entryCategories : withdrawalCategories;
 
@@ -174,10 +301,38 @@ export default function FinancePage() {
     setCashModalOpen(false);
   };
 
+  const openClientPayment = (group: ClientFinanceGroup) => {
+    paymentMutation.reset();
+    setSelectedClient(group);
+    setAmount(group.nextDue ? installmentBalance(group.nextDue) : group.balance);
+    setMethod('pix');
+    setPaymentDate(today());
+    setPaymentNotes('');
+  };
+
+  const closeClientPayment = () => {
+    if (paymentMutation.isPending) return;
+    paymentMutation.reset();
+    setSelectedClient(null);
+  };
+
+  const openReversal = (receipt: PaymentReceipt) => {
+    reversalMutation.reset();
+    setSelectedReceipt(receipt);
+    setReversalReason('');
+  };
+
+  const closeReversal = () => {
+    if (reversalMutation.isPending) return;
+    reversalMutation.reset();
+    setSelectedReceipt(null);
+    setReversalReason('');
+  };
+
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Caixa, parcelas e cobranca"
+        eyebrow="Caixa, clientes e cobranca"
         title="Financeiro"
         action={canManageFinance && (
           <button className="btn-primary" type="button" onClick={() => setCashModalOpen(true)}>
@@ -188,6 +343,7 @@ export default function FinancePage() {
       />
 
       {installmentsQuery.error && <ErrorState error={installmentsQuery.error} />}
+      {paymentsQuery.error && <ErrorState error={paymentsQuery.error} />}
       {cashQuery.error && <ErrorState error={cashQuery.error} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -235,12 +391,10 @@ export default function FinancePage() {
               const Icon = isEntry ? ArrowDownToLine : ArrowUpFromLine;
               return (
                 <article key={item.id} className="flex items-center gap-3 px-5 py-4 sm:px-6">
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isEntry ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isEntry ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}><Icon className="h-5 w-5" /></div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-slate-900">{item.description}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{categoryLabel[item.kind] ?? item.kind} · {formatDate(item.occurred_on)}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{categoryLabel[item.kind] ?? item.kind} - {formatDate(item.occurred_on)}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={`font-extrabold ${isEntry ? 'text-emerald-700' : 'text-red-700'}`}>{isEntry ? '+' : '-'} {formatCurrency(item.amount)}</p>
@@ -254,33 +408,83 @@ export default function FinancePage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="font-display text-2xl text-slate-950">Parcelas dos contratos</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div><p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-700">Contas por pessoa</p><h2 className="mt-1 font-display text-2xl text-slate-950">Clientes e recebimentos</h2></div>
+          <p className="text-sm font-semibold text-slate-500">{filteredClients.length} cliente{filteredClients.length === 1 ? '' : 's'}</p>
+        </div>
+
         <div className="panel flex flex-col gap-3 p-3 md:flex-row">
-          <div className="relative flex-1"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cliente, contrato ou aparelho" /></div>
+          <div className="relative flex-1"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cliente, CPF, contrato ou aparelho" /></div>
           <select className="input md:w-48" value={status} onChange={(event) => setStatus(event.target.value as 'all' | InstallmentStatus)}>
             <option value="all">Todos os status</option>
             {Object.entries(statusLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </div>
 
-        {filtered.length === 0 ? <EmptyState title="Nenhuma parcela encontrada" description="As parcelas sao geradas automaticamente com os novos contratos." /> : (
-          <div className="table-shell overflow-x-auto">
-            <table className="min-w-[980px]">
-              <thead><tr><th>Contrato / Cliente</th><th>Aparelho</th><th>Parcela</th><th>Vencimento</th><th>Total devido</th><th>Pago</th><th>Saldo</th><th>Status</th><th /></tr></thead>
-              <tbody>{filtered.map((item) => (
-                <tr key={item.id}>
-                  <td><p className="font-bold text-slate-900">{item.contract?.client?.full_name}</p><p className="mt-0.5 font-mono text-[10px] text-slate-400">{item.contract?.contract_number}</p></td>
-                  <td>{item.contract?.device?.model}<p className="font-mono text-[10px] text-slate-400">{item.contract?.device?.serial_number}</p></td>
-                  <td className="font-bold">{item.contract?.deposit_as_first_installment && item.installment_number === 1 ? 'Caucao - ' : ''}{item.installment_number}/{(item.contract?.term_months ?? 0) + (item.contract?.deposit_as_first_installment ? 1 : 0)}</td>
-                  <td>{formatDate(item.due_date)}</td>
-                  <td className="font-bold">{formatCurrency(dueTotal(item))}</td>
-                  <td className="text-emerald-700">{formatCurrency(item.paid_amount)}</td>
-                  <td className="font-extrabold text-slate-950">{formatCurrency(balance(item))}</td>
-                  <td><span className={`status-pill ${statusTone[item.status]}`}>{statusLabel[item.status]}</span></td>
-                  <td className="text-right">{canManageFinance && !['paid', 'cancelled', 'renegotiated'].includes(item.status) && <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs" type="button" onClick={() => { setSelected(item); setAmount(balance(item)); }}>Baixar</button>}</td>
-                </tr>
-              ))}</tbody>
-            </table>
+        {filteredClients.length === 0 ? <EmptyState title="Nenhum cliente encontrado" description="Os clientes com contratos aparecerao aqui." /> : (
+          <div className="space-y-4">
+            {filteredClients.map((group) => {
+              const clientReceipts = receiptsByClient.get(group.clientId) ?? [];
+              const groupStatus = group.overdue > 0 ? 'Em atraso' : group.balance > 0 ? 'Em aberto' : 'Em dia';
+              const groupTone = group.overdue > 0 ? 'bg-red-50 text-red-700' : group.balance > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700';
+              return (
+                <article key={group.clientId} className="panel overflow-hidden p-0">
+                  <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-950 text-cyan-300"><UserRound className="h-5 w-5" /></div>
+                      <div className="min-w-0"><h3 className="truncate text-lg font-extrabold text-slate-950">{group.name}</h3><p className="mt-0.5 text-xs text-slate-500">CPF {group.cpf} - {group.contractNumbers.length} contrato{group.contractNumbers.length === 1 ? '' : 's'}</p></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[520px]">
+                      <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Contratado</p><p className="mt-1 font-extrabold text-slate-900">{formatCurrency(group.totalDue)}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recebido</p><p className="mt-1 font-extrabold text-emerald-700">{formatCurrency(group.paid)}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Saldo</p><p className="mt-1 font-extrabold text-slate-900">{formatCurrency(group.balance)}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Proximo vencimento</p><p className="mt-1 font-bold text-slate-700">{group.nextDue ? formatDate(group.nextDue.due_date) : 'Quitado'}</p></div>
+                    </div>
+                    <div className="flex items-center gap-2 lg:flex-col lg:items-stretch">
+                      <span className={`status-pill justify-center ${groupTone}`}>{groupStatus}</span>
+                      {canManageFinance && group.balance > 0 && <button className="btn-primary flex-1 whitespace-nowrap lg:flex-none" type="button" onClick={() => openClientPayment(group)}><Banknote className="h-4 w-4" />Receber</button>}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3 sm:px-6">
+                    {group.devices.map((device) => <span key={device} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600 shadow-sm"><Smartphone className="h-3.5 w-3.5 text-cyan-700" />{device}</span>)}
+                    {group.overdue > 0 && <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">Atraso: {formatCurrency(group.overdue)}</span>}
+                  </div>
+
+                  <div className="grid border-t border-slate-100 xl:grid-cols-2">
+                    <details className="group border-b border-slate-100 xl:border-b-0 xl:border-r">
+                      <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-bold text-slate-800 sm:px-6"><span>Ver parcelas ({group.installments.length})</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" /></summary>
+                      <div className="divide-y divide-slate-100 border-t border-slate-100">
+                        {group.installments.map((item) => (
+                          <div key={item.id} className="grid gap-2 px-5 py-3 text-xs sm:grid-cols-[1.2fr_.8fr_.8fr_auto] sm:items-center sm:px-6">
+                            <div><p className="font-bold text-slate-800">{item.contract?.device?.model} - parcela {item.installment_number}/{(item.contract?.term_months ?? 0) + (item.contract?.deposit_as_first_installment ? 1 : 0)}</p><p className="mt-0.5 font-mono text-[10px] text-slate-400">{item.contract?.contract_number}</p></div>
+                            <div><p className="text-slate-400">Vencimento</p><p className="mt-0.5 font-bold text-slate-700">{formatDate(item.due_date)}</p></div>
+                            <div><p className="text-slate-400">Saldo</p><p className="mt-0.5 font-extrabold text-slate-900">{formatCurrency(installmentBalance(item))}</p></div>
+                            <span className={`status-pill ${statusTone[item.status]}`}>{statusLabel[item.status]}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-bold text-slate-800 sm:px-6"><span className="flex items-center gap-2"><History className="h-4 w-4 text-cyan-700" />Recebimentos ({clientReceipts.length})</span><ChevronDown className="h-4 w-4 text-slate-400 transition group-open:rotate-180" /></summary>
+                      {clientReceipts.length === 0 ? <p className="border-t border-slate-100 px-5 py-4 text-sm text-slate-500 sm:px-6">Nenhum recebimento registrado.</p> : (
+                        <div className="divide-y divide-slate-100 border-t border-slate-100">
+                          {clientReceipts.map((receipt) => (
+                            <div key={receipt.key} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:px-6">
+                              <div className="min-w-0 flex-1"><p className="font-bold text-slate-800">{receipt.externalReference === 'upfront_deposit' ? 'Caucao inicial' : 'Recebimento'} - {paymentMethodLabel[receipt.method] ?? receipt.method}</p><p className="mt-0.5 text-xs text-slate-500">{formatDate(receipt.paidAt)}{receipt.reversalReason ? ` - ${receipt.reversalReason}` : ''}</p></div>
+                              <p className="font-extrabold text-slate-950">{formatCurrency(receipt.amount)}</p>
+                              <span className={`status-pill ${receipt.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{receipt.status === 'confirmed' ? 'Confirmado' : 'Estornado'}</span>
+                              {canManageFinance && receipt.status === 'confirmed' && <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs text-red-700" type="button" onClick={() => openReversal(receipt)}><RotateCcw className="h-3.5 w-3.5" />Estornar</button>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </details>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>
@@ -291,12 +495,8 @@ export default function FinancePage() {
             {cashMutation.error && <ErrorState error={cashMutation.error} />}
             <input type="hidden" {...cashForm.register('direction')} />
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5">
-              <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'in' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('in')}>
-                Entrada
-              </button>
-              <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'out' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('out')}>
-                Retirada
-              </button>
+              <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'in' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('in')}>Entrada</button>
+              <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'out' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('out')}>Retirada</button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-field"><span>Valor *</span><input className="input" type="number" min="0.01" step="0.01" {...cashForm.register('amount', { valueAsNumber: true })} />{cashForm.formState.errors.amount && <small>{cashForm.formState.errors.amount.message}</small>}</label>
@@ -304,22 +504,34 @@ export default function FinancePage() {
             </div>
             <label className="form-field"><span>Categoria *</span><select className="input" {...cashForm.register('kind')}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{cashForm.formState.errors.kind && <small>{cashForm.formState.errors.kind.message}</small>}</label>
             <label className="form-field"><span>Descricao *</span><input className="input" placeholder="Identifique a movimentacao" {...cashForm.register('description')} />{cashForm.formState.errors.description && <small>{cashForm.formState.errors.description.message}</small>}</label>
-            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5">
-              <button className="btn-secondary" type="button" onClick={closeCashModal}>Cancelar</button>
-              <button className="btn-primary" disabled={cashMutation.isPending} type="submit"><Banknote className="h-4 w-4" />{cashMutation.isPending ? 'Registrando...' : 'Registrar movimentacao'}</button>
-            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={closeCashModal}>Cancelar</button><button className="btn-primary" disabled={cashMutation.isPending} type="submit"><Banknote className="h-4 w-4" />{cashMutation.isPending ? 'Registrando...' : 'Registrar movimentacao'}</button></div>
           </form>
         </Modal>
       )}
 
-      {selected && (
-        <Modal title="Registrar pagamento" description={`${selected.contract?.client?.full_name} · parcela ${selected.installment_number}`} onClose={() => setSelected(null)}>
+      {selectedClient && (
+        <Modal title={`Receber de ${selectedClient.name}`} description="O valor sera aplicado automaticamente nas parcelas mais antigas." onClose={closeClientPayment}>
           <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); paymentMutation.mutate(); }}>
             {paymentMutation.error && <ErrorState error={paymentMutation.error} />}
-            <div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-100 p-4 text-sm"><div><p className="text-xs text-slate-500">Saldo devido</p><p className="mt-1 font-extrabold text-slate-950">{formatCurrency(balance(selected))}</p></div><div><p className="text-xs text-slate-500">Vencimento</p><p className="mt-1 font-bold text-slate-800">{formatDate(selected.due_date)}</p></div></div>
-            <label className="form-field"><span>Valor recebido *</span><input className="input" type="number" min="0.01" max={balance(selected)} step="0.01" required value={amount} onChange={(event) => setAmount(Number(event.target.value))} /></label>
-            <label className="form-field"><span>Meio de pagamento</span><select className="input" value={method} onChange={(event) => setMethod(event.target.value)}><option value="pix">Pix</option><option value="card">Cartao</option><option value="transfer">Transferencia</option><option value="cash">Dinheiro</option></select></label>
-            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={() => setSelected(null)}>Cancelar</button><button className="btn-primary" disabled={paymentMutation.isPending || amount <= 0 || amount > balance(selected)} type="submit"><Banknote className="h-4 w-4" />{paymentMutation.isPending ? 'Registrando...' : 'Confirmar recebimento'}</button></div>
+            <div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-100 p-4 text-sm"><div><p className="text-xs text-slate-500">Saldo total</p><p className="mt-1 font-extrabold text-slate-950">{formatCurrency(selectedClient.balance)}</p></div><div><p className="text-xs text-slate-500">Proximo vencimento</p><p className="mt-1 font-bold text-slate-800">{selectedClient.nextDue ? formatDate(selectedClient.nextDue.due_date) : 'Quitado'}</p></div></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="form-field"><span>Valor recebido *</span><input className="input" type="number" min="0.01" max={selectedClient.balance} step="0.01" required value={amount} onChange={(event) => setAmount(Number(event.target.value))} /></label>
+              <label className="form-field"><span>Data do pagamento *</span><input className="input" type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /></label>
+            </div>
+            <label className="form-field"><span>Forma de pagamento *</span><select className="input" value={method} onChange={(event) => setMethod(event.target.value)}><option value="pix">Pix</option><option value="card">Cartao</option><option value="transfer">Transferencia</option><option value="cash">Dinheiro</option><option value="other">Outro</option></select></label>
+            <label className="form-field"><span>Observacao</span><input className="input" value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} placeholder="Opcional" /></label>
+            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={closeClientPayment}>Cancelar</button><button className="btn-primary" disabled={paymentMutation.isPending || amount <= 0 || amount > selectedClient.balance || !paymentDate} type="submit"><Banknote className="h-4 w-4" />{paymentMutation.isPending ? 'Registrando...' : 'Confirmar recebimento'}</button></div>
+          </form>
+        </Modal>
+      )}
+
+      {selectedReceipt && (
+        <Modal title="Estornar recebimento" description={`${formatCurrency(selectedReceipt.amount)} - ${paymentMethodLabel[selectedReceipt.method] ?? selectedReceipt.method}`} onClose={closeReversal}>
+          <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); reversalMutation.mutate(); }}>
+            {reversalMutation.error && <ErrorState error={reversalMutation.error} />}
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">O saldo do cliente e o Livro Caixa serao atualizados automaticamente.</div>
+            <label className="form-field"><span>Motivo do estorno *</span><textarea className="input min-h-24 resize-y py-3" minLength={3} required value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} placeholder="Explique o motivo" /></label>
+            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={closeReversal}>Cancelar</button><button className="btn-primary bg-red-700 hover:bg-red-800" disabled={reversalMutation.isPending || reversalReason.trim().length < 3} type="submit"><RotateCcw className="h-4 w-4" />{reversalMutation.isPending ? 'Estornando...' : 'Confirmar estorno'}</button></div>
           </form>
         </Modal>
       )}

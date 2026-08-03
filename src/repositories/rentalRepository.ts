@@ -236,9 +236,16 @@ export async function listInstallments(): Promise<Installment[]> {
 }
 
 export async function listPayments(): Promise<Payment[]> {
-  const { data, error } = await db().from('payments').select('*').order('paid_at', { ascending: false });
+  const { data, error } = await db()
+    .from('payments')
+    .select('*,installment:installments(*,contract:contracts(*,client:rental_clients(id,full_name,cpf),device:devices(id,model,serial_number,status)))')
+    .order('paid_at', { ascending: false });
   throwIfError(error);
-  return ((data ?? []) as unknown as Payment[]).map((row) => ({ ...row, amount: toMoney(row.amount) }));
+  return ((data ?? []) as unknown as Payment[]).map((row) => ({
+    ...row,
+    amount: toMoney(row.amount),
+    installment: row.installment ? normalizeInstallment(row.installment) : undefined,
+  }));
 }
 
 export async function listCashTransactions(): Promise<CashTransaction[]> {
@@ -281,6 +288,32 @@ export async function recordPayment(input: {
   });
   throwIfError(error);
   return String(data);
+}
+
+export async function recordClientPayment(input: {
+  clientId: string;
+  amount: number;
+  method: string;
+  paidAt: string;
+  notes?: string;
+}): Promise<string> {
+  const { data, error } = await db().rpc('record_client_payment', {
+    p_client_id: input.clientId,
+    p_amount: input.amount,
+    p_method: input.method,
+    p_paid_at: input.paidAt,
+    p_notes: input.notes ?? null,
+  });
+  throwIfError(error);
+  return String(data);
+}
+
+export async function reversePayment(paymentId: string, reason: string): Promise<void> {
+  const { error } = await db().rpc('reverse_payment', {
+    p_payment_id: paymentId,
+    p_reason: reason,
+  });
+  throwIfError(error);
 }
 
 export async function listMdmDevices(): Promise<MdmDevice[]> {

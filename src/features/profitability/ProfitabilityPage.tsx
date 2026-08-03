@@ -26,7 +26,7 @@ export default function ProfitabilityPage() {
       const rentalRevenue = deviceInstallments.reduce((sum, item) => sum + item.paid_amount, 0);
       const deviceTransactions = query.data.transactions.filter((item) => item.device_id === device.id && item.status === 'confirmed');
       const saleRevenue = deviceTransactions.filter((item) => item.direction === 'in' && item.kind === 'device_sale').reduce((sum, item) => sum + item.amount, 0);
-      const otherExpenses = deviceTransactions.filter((item) => item.direction === 'out').reduce((sum, item) => sum + item.amount, 0);
+      const otherExpenses = deviceTransactions.filter((item) => item.direction === 'out' && item.kind !== 'payment_reversal').reduce((sum, item) => sum + item.amount, 0);
       const months = Math.max(1, differenceInMonths(now, parseISO(device.purchase_date)));
       const monthlyNet = (rentalRevenue - otherExpenses) / months;
       const result = calculateProfitability({ rentalRevenue, saleRevenue, purchaseCost: device.purchase_amount, maintenanceCost: 0, mdmCost: 0, insuranceCost: 0, fees: 0, taxes: 0, otherExpenses, averageMonthlyNet: monthlyNet });

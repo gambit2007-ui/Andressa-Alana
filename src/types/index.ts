@@ -137,6 +137,11 @@ export type Payment = {
   method: string;
   paid_at: string;
   status: 'confirmed' | 'reversed';
+  external_reference: string | null;
+  notes: string | null;
+  reversed_at: string | null;
+  reversal_reason: string | null;
+  installment?: Installment;
 };
 
 export type CashTransaction = {
