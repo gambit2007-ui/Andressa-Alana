@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyPayment,
+  calculateContractPlan,
   calculateCashSummary,
   calculateCharges,
   calculateProfitability,
@@ -43,6 +44,16 @@ describe('encargos e pagamentos', () => {
 });
 
 describe('resultado, caucao, venda, ROI e payback', () => {
+  it('trata a caucao como parcela inicial e soma as mensalidades restantes', () => {
+    expect(calculateContractPlan({ remainingInstallments: 4, monthlyAmount: 850, depositAmount: 850 }))
+      .toEqual({ remainingInstallments: 4, upfrontInstallments: 1, totalInstallments: 5, remainingAmount: 3400, totalReceivable: 4250 });
+  });
+
+  it('mantem apenas as mensalidades quando nao existe caucao', () => {
+    expect(calculateContractPlan({ remainingInstallments: 4, monthlyAmount: 850, depositAmount: 0 }))
+      .toEqual({ remainingInstallments: 4, upfrontInstallments: 0, totalInstallments: 4, remainingAmount: 3400, totalReceivable: 3400 });
+  });
+
   it('nao reconhece caucao como receita operacional', () => {
     expect(calculateCashSummary({ confirmedPayments: [700, 700], heldDeposits: [900], expenses: [200] }))
       .toEqual({ receivedRevenue: 1400, depositsHeld: 900, expenses: 200, cashBalance: 2100, operationalResult: 1200 });

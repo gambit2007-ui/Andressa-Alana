@@ -9,6 +9,23 @@ export type InstallmentDraft = {
   amount: number;
 };
 
+export function calculateContractPlan(input: {
+  remainingInstallments: number;
+  monthlyAmount: number;
+  depositAmount: number;
+}) {
+  const remainingAmount = roundMoney(input.remainingInstallments * input.monthlyAmount);
+  const upfrontInstallments = input.depositAmount > 0 ? 1 : 0;
+
+  return {
+    remainingInstallments: input.remainingInstallments,
+    upfrontInstallments,
+    totalInstallments: input.remainingInstallments + upfrontInstallments,
+    remainingAmount,
+    totalReceivable: roundMoney(input.depositAmount + remainingAmount),
+  };
+}
+
 export function dueDateForMonth(startDate: string, monthOffset: number, dueDay: number): string {
   const start = parseISO(startDate);
   const targetMonth = addMonths(new Date(start.getFullYear(), start.getMonth(), 1), monthOffset);

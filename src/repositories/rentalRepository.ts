@@ -45,6 +45,7 @@ const normalizeContract = (row: Contract): Contract => ({
   term_months: Number(row.term_months),
   monthly_amount: toMoney(row.monthly_amount),
   deposit_amount: toMoney(row.deposit_amount),
+  deposit_as_first_installment: Boolean(row.deposit_as_first_installment),
   late_fee_percent: toMoney(row.late_fee_percent),
   daily_interest_percent: toMoney(row.daily_interest_percent),
   purchase_option_amount: row.purchase_option_amount === null ? null : toMoney(row.purchase_option_amount),

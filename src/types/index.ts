@@ -94,6 +94,7 @@ export type Contract = {
   term_months: number;
   monthly_amount: number;
   deposit_amount: number;
+  deposit_as_first_installment: boolean;
   late_fee_percent: number;
   daily_interest_percent: number;
   purchase_option: boolean;

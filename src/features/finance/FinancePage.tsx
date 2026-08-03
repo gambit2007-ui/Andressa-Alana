@@ -271,7 +271,7 @@ export default function FinancePage() {
                 <tr key={item.id}>
                   <td><p className="font-bold text-slate-900">{item.contract?.client?.full_name}</p><p className="mt-0.5 font-mono text-[10px] text-slate-400">{item.contract?.contract_number}</p></td>
                   <td>{item.contract?.device?.model}<p className="font-mono text-[10px] text-slate-400">{item.contract?.device?.serial_number}</p></td>
-                  <td className="font-bold">{item.installment_number}/{item.contract?.term_months}</td>
+                  <td className="font-bold">{item.contract?.deposit_as_first_installment && item.installment_number === 1 ? 'Caucao - ' : ''}{item.installment_number}/{(item.contract?.term_months ?? 0) + (item.contract?.deposit_as_first_installment ? 1 : 0)}</td>
                   <td>{formatDate(item.due_date)}</td>
                   <td className="font-bold">{formatCurrency(dueTotal(item))}</td>
                   <td className="text-emerald-700">{formatCurrency(item.paid_amount)}</td>
