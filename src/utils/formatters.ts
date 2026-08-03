@@ -1,10 +1,22 @@
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export const formatCurrency = (value: number): string => new Intl.NumberFormat('pt-BR', {
+const finiteValue = (value: number | null | undefined): number => Number.isFinite(Number(value)) ? Number(value) : 0;
+
+export const formatCurrency = (value: number | null | undefined): string => new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'BRL',
-}).format(value);
+}).format(finiteValue(value));
+
+export const formatPercentage = (value: number | null | undefined): string => `${new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}).format(finiteValue(value))}%`;
+
+export const formatMonths = (value: number | null | undefined): string => {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return '—';
+  return `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Number(value))} meses`;
+};
 
 export const formatDate = (value: string | null | undefined): string => {
   if (!value) return '-';
