@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { CalendarDays, FilePlus2, Search, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
+import { CalendarDays, FilePlus2, PencilLine, Save, Search, ShieldCheck, Smartphone, UserRound } from 'lucide-react';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
 import { generateInstallmentSchedule } from '../../domain/finance';
-import { createContract, listClients, listContracts, listDevices } from '../../repositories/rentalRepository';
+import { createContract, listClients, listContracts, listDevices, updateContract } from '../../repositories/rentalRepository';
 import { contractSchema, type ContractFormData } from '../../schemas/forms';
-import type { ContractStatus } from '../../types';
+import type { Contract, ContractStatus } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const statusLabel: Record<ContractStatus, string> = { draft: 'Rascunho', active: 'Ativo', overdue: 'Inadimplente', completed: 'Finalizado', cancelled: 'Cancelado', renegotiated: 'Renegociado' };
@@ -20,10 +20,25 @@ const defaultValues: ContractFormData = {
   daily_interest_percent: 0.033, purchase_option: false, purchase_option_amount: 0,
 };
 
+const contractFormValues = (contract: Contract): ContractFormData => ({
+  client_id: contract.client_id,
+  device_id: contract.device_id,
+  start_date: contract.start_date.slice(0, 10),
+  due_day: contract.due_day,
+  term_months: contract.term_months,
+  monthly_amount: contract.monthly_amount,
+  deposit_amount: contract.deposit_amount,
+  late_fee_percent: contract.late_fee_percent,
+  daily_interest_percent: contract.daily_interest_percent,
+  purchase_option: contract.purchase_option,
+  purchase_option_amount: contract.purchase_option_amount ?? 0,
+});
+
 export default function ContractsPage() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | ContractStatus>('all');
   const contractsQuery = useQuery({ queryKey: ['contracts'], queryFn: listContracts });
@@ -40,7 +55,9 @@ export default function ContractsPage() {
   }).slice(0, 4), [watched.start_date, watched.due_day, watched.term_months, watched.monthly_amount]);
 
   const mutation = useMutation({
-    mutationFn: (values: ContractFormData) => createContract(profile.organization_id, values),
+    mutationFn: ({ values, contractId }: { values: ContractFormData; contractId?: string }) => contractId
+      ? updateContract(contractId, values)
+      : createContract(profile.organization_id, values),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['contracts'] }),
@@ -49,9 +66,32 @@ export default function ContractsPage() {
         queryClient.invalidateQueries({ queryKey: ['rental-overview'] }),
       ]);
       setModalOpen(false);
+      setEditingContract(null);
       form.reset(defaultValues);
     },
   });
+
+  const openCreateModal = () => {
+    mutation.reset();
+    setEditingContract(null);
+    form.reset(defaultValues);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (contract: Contract) => {
+    mutation.reset();
+    setEditingContract(contract);
+    form.reset(contractFormValues(contract));
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (mutation.isPending) return;
+    setModalOpen(false);
+    setEditingContract(null);
+    form.reset(defaultValues);
+    mutation.reset();
+  };
 
   const filtered = useMemo(() => (contractsQuery.data ?? []).filter((contract) => {
     const term = search.toLowerCase();
@@ -60,14 +100,16 @@ export default function ContractsPage() {
   }), [contractsQuery.data, search, status]);
 
   if (contractsQuery.isLoading || clientsQuery.isLoading || devicesQuery.isLoading) return <LoadingState />;
+  const canManage = ['admin', 'manager', 'operator'].includes(profile.role);
   const availableDevices = (devicesQuery.data ?? []).filter((device) => device.status === 'available');
-  const canCreate = profile.role !== 'viewer' && (clientsQuery.data?.length ?? 0) > 0 && availableDevices.length > 0;
+  const formDevices = (devicesQuery.data ?? []).filter((device) => device.status === 'available' || device.id === editingContract?.device_id);
+  const canCreate = canManage && (clientsQuery.data?.length ?? 0) > 0 && availableDevices.length > 0;
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Locacao e ciclo contratual" title="Contratos" action={<button className="btn-primary" disabled={!canCreate} type="button" onClick={() => setModalOpen(true)}><FilePlus2 className="h-4 w-4" />Novo contrato</button>} />
+      <PageHeader eyebrow="Locacao e ciclo contratual" title="Contratos" action={<button className="btn-primary" disabled={!canCreate} type="button" onClick={openCreateModal}><FilePlus2 className="h-4 w-4" />Novo contrato</button>} />
       {(contractsQuery.error || clientsQuery.error || devicesQuery.error) && <ErrorState error={contractsQuery.error ?? clientsQuery.error ?? devicesQuery.error} />}
-      {!canCreate && profile.role !== 'viewer' && <div className="alert border-amber-200 bg-amber-50 text-amber-800">Cadastre um cliente e mantenha ao menos um aparelho disponivel para abrir um contrato.</div>}
+      {!canCreate && canManage && <div className="alert border-amber-200 bg-amber-50 text-amber-800">Cadastre um cliente e mantenha ao menos um aparelho disponivel para abrir um contrato.</div>}
 
       <div className="panel flex flex-col gap-3 p-3 md:flex-row">
         <div className="relative flex-1"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cliente, contrato, modelo ou serie" /></div>
@@ -92,18 +134,19 @@ export default function ContractsPage() {
                 <div><p className="text-slate-400">Inicio</p><p className="mt-1 font-bold text-slate-700">{formatDate(contract.start_date)}</p></div>
                 <div><p className="text-slate-400">Prazo</p><p className="mt-1 font-bold text-slate-700">{contract.term_months} meses</p></div>
               </div>
+              {canManage && ['active', 'overdue'].includes(contract.status) && <button className="btn-secondary mt-5 w-full" type="button" onClick={() => openEditModal(contract)}><PencilLine className="h-4 w-4" />Editar contrato</button>}
             </article>
           ))}
         </div>
       )}
 
       {modalOpen && (
-        <Modal title="Novo contrato de locacao" description="O contrato, a reserva do aparelho e as parcelas serao criados na mesma transacao." onClose={() => setModalOpen(false)}>
-          <form className="space-y-6" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+        <Modal title={editingContract ? 'Editar contrato' : 'Novo contrato de locacao'} description={editingContract ? editingContract.contract_number : 'O contrato, a reserva do aparelho e as parcelas serao criados na mesma transacao.'} onClose={closeModal}>
+          <form className="space-y-6" onSubmit={form.handleSubmit((values) => mutation.mutate({ values, contractId: editingContract?.id }))}>
             {mutation.error && <ErrorState error={mutation.error} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-field"><span>Cliente *</span><select className="input" {...form.register('client_id')}><option value="">Selecione</option>{clientsQuery.data?.map((client) => <option key={client.id} value={client.id}>{client.full_name} · {client.cpf}</option>)}</select></label>
-              <label className="form-field"><span>iPhone disponivel *</span><select className="input" {...form.register('device_id')}><option value="">Selecione</option>{availableDevices.map((device) => <option key={device.id} value={device.id}>{device.model} · SN {device.serial_number}</option>)}</select></label>
+              <label className="form-field"><span>iPhone *</span><select className="input" {...form.register('device_id')}><option value="">Selecione</option>{formDevices.map((device) => <option key={device.id} value={device.id}>{device.model} · SN {device.serial_number}</option>)}</select></label>
               <label className="form-field"><span>Data de inicio *</span><input className="input" type="date" {...form.register('start_date')} /></label>
               <label className="form-field"><span>Prazo em meses (1 a 60)</span><input className="input" type="number" min="1" max="60" step="1" inputMode="numeric" {...form.register('term_months', { valueAsNumber: true })} />{form.formState.errors.term_months && <small className="text-red-600">Informe um prazo entre 1 e 60 meses.</small>}</label>
               <label className="form-field"><span>Mensalidade</span><input className="input" type="number" step="0.01" {...form.register('monthly_amount', { valueAsNumber: true })} /></label>
@@ -120,7 +163,7 @@ export default function ContractsPage() {
               <div className="mt-3 grid gap-2 sm:grid-cols-4">{preview.map((item) => <div key={item.installmentNumber} className="rounded-xl bg-white p-3 text-xs"><p className="text-slate-400">Parcela {item.installmentNumber}</p><p className="mt-1 font-bold text-slate-800">{formatDate(item.dueDate)}</p><p className="mt-1 text-cyan-700">{formatCurrency(item.amount)}</p></div>)}</div>
               <p className="mt-3 flex items-center gap-2 text-[11px] text-cyan-800"><ShieldCheck className="h-3.5 w-3.5" />Dias 29, 30 e 31 sao ajustados ao ultimo dia valido de cada mes.</p>
             </div>
-            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={() => setModalOpen(false)}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{mutation.isPending ? 'Gerando...' : 'Gerar contrato e parcelas'}</button></div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" disabled={mutation.isPending} type="button" onClick={closeModal}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{editingContract ? <Save className="h-4 w-4" /> : <FilePlus2 className="h-4 w-4" />}{mutation.isPending ? 'Salvando...' : editingContract ? 'Salvar alteracoes' : 'Gerar contrato e parcelas'}</button></div>
           </form>
         </Modal>
       )}

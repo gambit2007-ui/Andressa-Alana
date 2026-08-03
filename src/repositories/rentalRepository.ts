@@ -206,6 +206,25 @@ export async function createContract(organizationId: string, values: ContractFor
   return String(data);
 }
 
+export async function updateContract(contractId: string, values: ContractFormData): Promise<string> {
+  const { data, error } = await db().rpc('update_contract_with_installments', {
+    p_contract_id: contractId,
+    p_client_id: values.client_id,
+    p_device_id: values.device_id,
+    p_start_date: values.start_date,
+    p_due_day: values.due_day,
+    p_term_months: values.term_months,
+    p_monthly_amount: values.monthly_amount,
+    p_deposit_amount: values.deposit_amount,
+    p_late_fee_percent: values.late_fee_percent,
+    p_daily_interest_percent: values.daily_interest_percent,
+    p_purchase_option: values.purchase_option,
+    p_purchase_option_amount: values.purchase_option ? values.purchase_option_amount : null,
+  });
+  throwIfError(error);
+  return String(data);
+}
+
 export async function listInstallments(): Promise<Installment[]> {
   const { data, error } = await db()
     .from('installments')
