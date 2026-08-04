@@ -29,6 +29,13 @@ describe('cronograma de parcelas', () => {
     expect(schedule).toHaveLength(7);
     expect(schedule[6]).toEqual({ installmentNumber: 7, dueDate: '2027-03-10', amount: 450 });
   });
+
+  it('usa a primeira mensalidade informada e gera exatamente a quantidade solicitada', () => {
+    const schedule = generateInstallmentSchedule({ firstInstallmentDate: '2026-09-03', dueDay: 10, termMonths: 4, monthlyAmount: 480 });
+    expect(schedule).toHaveLength(4);
+    expect(schedule[0]).toEqual({ installmentNumber: 1, dueDate: '2026-09-03', amount: 480 });
+    expect(schedule[3]?.dueDate).toBe('2026-12-10');
+  });
 });
 
 describe('encargos e pagamentos', () => {
@@ -44,14 +51,14 @@ describe('encargos e pagamentos', () => {
 });
 
 describe('resultado, caucao, venda, ROI e payback', () => {
-  it('trata a caucao como parcela inicial e soma as mensalidades restantes', () => {
-    expect(calculateContractPlan({ remainingInstallments: 4, monthlyAmount: 850, depositAmount: 850 }))
-      .toEqual({ remainingInstallments: 4, upfrontInstallments: 1, totalInstallments: 5, remainingAmount: 3400, totalReceivable: 4250 });
+  it('mantem a caucao separada de quatro mensalidades', () => {
+    expect(calculateContractPlan({ monthlyInstallments: 4, monthlyAmount: 480, depositAmount: 480 }))
+      .toEqual({ monthlyInstallments: 4, monthlyTotal: 1920, depositAmount: 480, totalContract: 2400, amountReceived: 480, remainingBalance: 1920 });
   });
 
   it('mantem apenas as mensalidades quando nao existe caucao', () => {
-    expect(calculateContractPlan({ remainingInstallments: 4, monthlyAmount: 850, depositAmount: 0 }))
-      .toEqual({ remainingInstallments: 4, upfrontInstallments: 0, totalInstallments: 4, remainingAmount: 3400, totalReceivable: 3400 });
+    expect(calculateContractPlan({ monthlyInstallments: 4, monthlyAmount: 850, depositAmount: 0 }))
+      .toEqual({ monthlyInstallments: 4, monthlyTotal: 3400, depositAmount: 0, totalContract: 3400, amountReceived: 0, remainingBalance: 3400 });
   });
 
   it('nao reconhece caucao como receita operacional', () => {

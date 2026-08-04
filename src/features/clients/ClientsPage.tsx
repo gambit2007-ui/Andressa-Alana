@@ -2,32 +2,48 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Camera, FileCheck2, Mail, MapPin, Plus, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
+import { Camera, FileCheck2, Mail, MapPin, PencilLine, Plus, Save, Search, ShieldCheck, Upload, UserRound } from 'lucide-react';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
 import { clientSchema, type ClientFormData } from '../../schemas/forms';
-import { createClient, listClients, uploadClientDocument } from '../../repositories/rentalRepository';
-import type { ClientDocumentKind } from '../../types';
+import { createClient, listClients, updateClient, uploadClientDocument } from '../../repositories/rentalRepository';
+import type { Client, ClientDocumentKind } from '../../types';
 import { displayCpf, formatCurrency, formatDate } from '../../utils/formatters';
 
 const defaultValues: ClientFormData = {
-  full_name: '', cpf: '', rg: '', phone: '', email: '', profession: '', monthly_income: 0,
-  address_line: '', address_number: '', neighborhood: '', city: '', state: '', postal_code: '',
+  full_name: '', cpf: '', rg: '', birth_date: '', phone: '', secondary_phone: '', email: '', profession: '', monthly_income: 0,
+  address_line: '', address_number: '', address_complement: '', neighborhood: '', city: '', state: '', postal_code: '',
+  work_address: '', reference_name: '', reference_phone: '',
   internal_risk_score: 650, notes: '',
 };
+
+const clientFormValues = (client: Client): ClientFormData => ({
+  full_name: client.full_name, cpf: client.cpf, rg: client.rg ?? '', birth_date: client.birth_date ?? '',
+  phone: client.phone, secondary_phone: client.secondary_phone ?? '', email: client.email ?? '',
+  profession: client.profession ?? '', monthly_income: client.monthly_income,
+  address_line: client.address_line ?? '', address_number: client.address_number ?? '',
+  address_complement: client.address_complement ?? '', neighborhood: client.neighborhood ?? '',
+  city: client.city ?? '', state: client.state ?? '', postal_code: client.postal_code ?? '',
+  work_address: client.work_address ?? '', reference_name: client.reference_name ?? '',
+  reference_phone: client.reference_phone ?? '', internal_risk_score: client.internal_risk_score,
+  notes: client.notes ?? '',
+});
 
 export default function ClientsPage() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [files, setFiles] = useState<Partial<Record<ClientDocumentKind, File>>>({});
   const clientsQuery = useQuery({ queryKey: ['clients'], queryFn: listClients });
   const form = useForm<ClientFormData>({ resolver: zodResolver(clientSchema), defaultValues });
 
   const mutation = useMutation({
     mutationFn: async (values: ClientFormData) => {
-      const client = await createClient(profile.organization_id, values);
+      const client = editingClient
+        ? await updateClient(profile.organization_id, editingClient.id, values)
+        : await createClient(profile.organization_id, values);
       await Promise.all(Object.entries(files).map(([kind, file]) => uploadClientDocument({
         organizationId: profile.organization_id,
         clientId: client.id,
@@ -39,6 +55,7 @@ export default function ClientsPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
       setModalOpen(false);
+      setEditingClient(null);
       setFiles({});
       form.reset(defaultValues);
     },
@@ -49,13 +66,37 @@ export default function ClientsPage() {
     return client.full_name.toLowerCase().includes(term) || client.cpf.includes(search.replace(/\D/g, '')) || client.phone.includes(search);
   }), [clientsQuery.data, search]);
 
-  const canWrite = profile.role !== 'viewer';
+  const canWrite = ['admin', 'manager', 'operator'].includes(profile.role);
+
+  const openCreateModal = () => {
+    mutation.reset();
+    setEditingClient(null);
+    setFiles({});
+    form.reset(defaultValues);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (client: Client) => {
+    mutation.reset();
+    setEditingClient(client);
+    setFiles({});
+    form.reset(clientFormValues(client));
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (mutation.isPending) return;
+    setModalOpen(false);
+    setEditingClient(null);
+    setFiles({});
+    form.reset(defaultValues);
+  };
 
   if (clientsQuery.isLoading) return <LoadingState />;
 
   return (
     <div className="space-y-7">
-      <PageHeader eyebrow="Cadastro e risco" title="Clientes" action={canWrite ? <button className="btn-primary" type="button" onClick={() => setModalOpen(true)}><Plus className="h-4 w-4" />Novo cliente</button> : undefined} />
+      <PageHeader eyebrow="Cadastro e risco" title="Clientes" action={canWrite ? <button className="btn-primary" type="button" onClick={openCreateModal}><Plus className="h-4 w-4" />Novo cliente</button> : undefined} />
       {clientsQuery.error && <ErrorState error={clientsQuery.error} />}
 
       <div className="panel p-3">
@@ -85,6 +126,7 @@ export default function ClientsPage() {
                   <div><p className="text-slate-400">Cadastro</p><p className="mt-1 font-bold text-slate-800">{formatDate(client.created_at)}</p></div>
                 </div>
                 <div className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400"><ShieldCheck className="h-3.5 w-3.5 text-cyan-600" />Classificacao interna, nao score de bureau</div>
+                {canWrite && <button className="btn-secondary mt-4 w-full" type="button" onClick={() => openEditModal(client)}><PencilLine className="h-4 w-4" />Editar cadastro</button>}
               </article>
             );
           })}
@@ -92,14 +134,16 @@ export default function ClientsPage() {
       )}
 
       {modalOpen && (
-        <Modal title="Novo cliente" description="Os documentos serao enviados para um bucket privado do Supabase." onClose={() => setModalOpen(false)}>
+        <Modal title={editingClient ? 'Editar cliente' : 'Novo cliente'} description="Os documentos serao enviados para um bucket privado do Supabase." onClose={closeModal}>
           <form className="space-y-6" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
             {mutation.error && <ErrorState error={mutation.error} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-field sm:col-span-2"><span>Nome completo *</span><input className="input" {...form.register('full_name')} />{form.formState.errors.full_name && <small className="text-red-600">{form.formState.errors.full_name.message}</small>}</label>
               <label className="form-field"><span>CPF *</span><input className="input" {...form.register('cpf')} /></label>
               <label className="form-field"><span>RG</span><input className="input" {...form.register('rg')} /></label>
+              <label className="form-field"><span>Data de nascimento</span><input className="input" type="date" {...form.register('birth_date')} /></label>
               <label className="form-field"><span>Telefone / WhatsApp *</span><input className="input" {...form.register('phone')} /></label>
+              <label className="form-field"><span>Telefone secundario</span><input className="input" {...form.register('secondary_phone')} /></label>
               <label className="form-field"><span>Email</span><input className="input" type="email" {...form.register('email')} /></label>
               <label className="form-field"><span>Profissao</span><input className="input" {...form.register('profession')} /></label>
               <label className="form-field"><span>Renda mensal</span><input className="input" type="number" step="0.01" {...form.register('monthly_income', { valueAsNumber: true })} /></label>
@@ -107,10 +151,14 @@ export default function ClientsPage() {
             <div className="grid gap-4 sm:grid-cols-6">
               <label className="form-field sm:col-span-4"><span>Endereco</span><input className="input" {...form.register('address_line')} /></label>
               <label className="form-field sm:col-span-2"><span>Numero</span><input className="input" {...form.register('address_number')} /></label>
+              <label className="form-field sm:col-span-3"><span>Complemento</span><input className="input" {...form.register('address_complement')} /></label>
               <label className="form-field sm:col-span-2"><span>Bairro</span><input className="input" {...form.register('neighborhood')} /></label>
               <label className="form-field sm:col-span-2"><span>Cidade</span><input className="input" {...form.register('city')} /></label>
               <label className="form-field"><span>UF</span><input className="input uppercase" maxLength={2} {...form.register('state')} /></label>
               <label className="form-field"><span>CEP</span><input className="input" {...form.register('postal_code')} /></label>
+              <label className="form-field sm:col-span-6"><span>Endereco de trabalho</span><input className="input" {...form.register('work_address')} /></label>
+              <label className="form-field sm:col-span-3"><span>Contato de referencia</span><input className="input" {...form.register('reference_name')} /></label>
+              <label className="form-field sm:col-span-3"><span>Telefone da referencia</span><input className="input" {...form.register('reference_phone')} /></label>
             </div>
             <label className="form-field"><span>Classificacao interna: {form.watch('internal_risk_score')}</span><input type="range" min="0" max="1000" className="w-full accent-cyan-700" {...form.register('internal_risk_score', { valueAsNumber: true })} /><small className="font-normal text-slate-500">Uso interno da GR Solution. Nao equivale a score oficial de credito.</small></label>
             <label className="form-field"><span>Observacoes</span><textarea className="input min-h-24" {...form.register('notes')} /></label>
@@ -132,7 +180,7 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={() => setModalOpen(false)}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{mutation.isPending ? 'Salvando...' : 'Cadastrar cliente'}</button></div>
+            <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={closeModal}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{editingClient ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}{mutation.isPending ? 'Salvando...' : editingClient ? 'Salvar alteracoes' : 'Cadastrar cliente'}</button></div>
           </form>
         </Modal>
       )}

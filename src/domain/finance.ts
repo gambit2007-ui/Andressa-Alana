@@ -1,30 +1,14 @@
 import { addMonths, differenceInCalendarDays, getDaysInMonth, parseISO } from 'date-fns';
 import type { AppRole, ContractStatus, InstallmentStatus } from '../types';
+import { calculateContractPlan, roundMoney } from './contractPlan';
 
-const roundMoney = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
+export { calculateContractPlan } from './contractPlan';
 
 export type InstallmentDraft = {
   installmentNumber: number;
   dueDate: string;
   amount: number;
 };
-
-export function calculateContractPlan(input: {
-  remainingInstallments: number;
-  monthlyAmount: number;
-  depositAmount: number;
-}) {
-  const remainingAmount = roundMoney(input.remainingInstallments * input.monthlyAmount);
-  const upfrontInstallments = input.depositAmount > 0 ? 1 : 0;
-
-  return {
-    remainingInstallments: input.remainingInstallments,
-    upfrontInstallments,
-    totalInstallments: input.remainingInstallments + upfrontInstallments,
-    remainingAmount,
-    totalReceivable: roundMoney(input.depositAmount + remainingAmount),
-  };
-}
 
 export function dueDateForMonth(startDate: string, monthOffset: number, dueDay: number): string {
   const start = parseISO(startDate);
@@ -36,14 +20,18 @@ export function dueDateForMonth(startDate: string, monthOffset: number, dueDay: 
 }
 
 export function generateInstallmentSchedule(input: {
-  startDate: string;
+  startDate?: string;
+  firstInstallmentDate?: string;
   dueDay: number;
   termMonths: number;
   monthlyAmount: number;
 }): InstallmentDraft[] {
+  const firstDueDate = input.firstInstallmentDate
+    ?? dueDateForMonth(input.startDate ?? new Date().toISOString().slice(0, 10), 1, input.dueDay);
+
   return Array.from({ length: input.termMonths }, (_, index) => ({
     installmentNumber: index + 1,
-    dueDate: dueDateForMonth(input.startDate, index + 1, input.dueDay),
+    dueDate: index === 0 ? firstDueDate : dueDateForMonth(firstDueDate, index, input.dueDay),
     amount: roundMoney(input.monthlyAmount),
   }));
 }

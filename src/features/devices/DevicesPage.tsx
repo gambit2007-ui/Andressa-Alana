@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const statusLabel: Record<DeviceStatus, string> = { available: 'Disponivel', rented: 'Alugado', maintenance: 'Manutencao', sold: 'Vendido', retired: 'Retirado' };
 const statusTone: Record<DeviceStatus, string> = { available: 'bg-emerald-50 text-emerald-700', rented: 'bg-cyan-50 text-cyan-700', maintenance: 'bg-amber-50 text-amber-700', sold: 'bg-slate-100 text-slate-600', retired: 'bg-red-50 text-red-700' };
-const defaultValues: DeviceFormData = { model: '', color: '', capacity_gb: 128, imei_1: '', imei_2: '', serial_number: '', battery_health: 100, purchase_date: new Date().toISOString().slice(0, 10), purchase_amount: 0, supplier: '', invoice_number: '', warranty_until: '', condition: 'Excelente', market_value: 0, mdm_enrolled: false };
+const defaultValues: DeviceFormData = { model: '', color: '', capacity_gb: 128, imei_1: '', imei_2: '', serial_number: '', battery_health: 100, purchase_date: new Date().toISOString().slice(0, 10), purchase_amount: 0, supplier: '', invoice_number: '', warranty_until: '', condition: 'Excelente', accessories: '', market_value: 0, indemnity_value: 0, notes: '', mdm_enrolled: false };
 
 const deviceFormValues = (device: Device): DeviceFormData => ({
   model: device.model,
@@ -28,7 +28,10 @@ const deviceFormValues = (device: Device): DeviceFormData => ({
   invoice_number: device.invoice_number ?? '',
   warranty_until: device.warranty_until?.slice(0, 10) ?? '',
   condition: device.condition,
+  accessories: device.accessories.join(', '),
   market_value: device.market_value,
+  indemnity_value: device.indemnity_value ?? device.market_value,
+  notes: device.notes ?? '',
   mdm_enrolled: device.mdm_enrolled,
 });
 
@@ -137,9 +140,12 @@ export default function DevicesPage() {
               <label className="form-field"><span>Garantia ate</span><input className="input" type="date" {...form.register('warranty_until')} /></label>
               <label className="form-field"><span>Valor de compra</span><input className="input" type="number" step="0.01" {...form.register('purchase_amount', { valueAsNumber: true })} /></label>
               <label className="form-field"><span>Valor de mercado</span><input className="input" type="number" step="0.01" {...form.register('market_value', { valueAsNumber: true })} /></label>
+              <label className="form-field"><span>Valor de indenizacao *</span><input className="input" type="number" min="0.01" step="0.01" {...form.register('indemnity_value', { valueAsNumber: true })} /></label>
               <label className="form-field"><span>Fornecedor</span><input className="input" {...form.register('supplier')} /></label>
               <label className="form-field"><span>Nota fiscal</span><input className="input" {...form.register('invoice_number')} /></label>
               <label className="form-field sm:col-span-2"><span>Condicao</span><select className="input" {...form.register('condition')}><option>Excelente</option><option>Bom</option><option>Regular</option><option>Necessita manutencao</option></select></label>
+              <label className="form-field sm:col-span-2"><span>Acessorios entregues</span><input className="input" placeholder="Cabo, carregador, caixa" {...form.register('accessories')} /></label>
+              <label className="form-field sm:col-span-2"><span>Observacoes e avarias</span><textarea className="input min-h-20" {...form.register('notes')} /></label>
               <label className="form-field sm:col-span-2"><span>Apple Business / MDM</span><select className="input" {...form.register('mdm_enrolled', { setValueAs: (value) => value === 'true' })}><option value="false">Desativado</option><option value="true">Ativo</option></select></label>
             </div>
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button className="btn-secondary" disabled={mutation.isPending} type="button" onClick={closeModal}>Cancelar</button><button className="btn-primary" disabled={mutation.isPending} type="submit">{editingDevice ? <Save className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}{mutation.isPending ? 'Salvando...' : editingDevice ? 'Salvar alteracoes' : 'Cadastrar aparelho'}</button></div>

@@ -21,16 +21,22 @@ export type Client = {
   full_name: string;
   cpf: string;
   rg: string | null;
+  birth_date?: string | null;
   phone: string;
+  secondary_phone?: string | null;
   email: string | null;
   profession: string | null;
   monthly_income: number;
   address_line: string | null;
   address_number: string | null;
+  address_complement?: string | null;
   neighborhood: string | null;
   city: string | null;
   state: string | null;
   postal_code: string | null;
+  work_address?: string | null;
+  reference_name?: string | null;
+  reference_phone?: string | null;
   internal_risk_score: number;
   risk_label: string;
   notes: string | null;
@@ -68,6 +74,8 @@ export type Device = {
   condition: string;
   accessories: string[];
   market_value: number;
+  indemnity_value?: number | null;
+  notes?: string | null;
   status: DeviceStatus;
   apple_business_registered: boolean;
   mdm_enrolled: boolean;
@@ -90,11 +98,15 @@ export type Contract = {
   contract_number: string;
   start_date: string;
   end_date: string;
+  first_installment_date?: string | null;
   due_day: number;
   term_months: number;
   monthly_amount: number;
   deposit_amount: number;
   deposit_as_first_installment: boolean;
+  deposit_paid_at?: string | null;
+  deposit_payment_method?: PaymentMethod | null;
+  indemnity_value?: number | null;
   late_fee_percent: number;
   daily_interest_percent: number;
   purchase_option: boolean;
@@ -104,6 +116,50 @@ export type Contract = {
   client?: Pick<Client, 'id' | 'full_name' | 'cpf'>;
   device?: Pick<Device, 'id' | 'model' | 'serial_number' | 'status'>;
 };
+
+export type PaymentMethod = 'pix' | 'card' | 'transfer' | 'cash' | 'other';
+
+export type ContractDocumentType = 'rental_contract' | 'delivery_term';
+export type ContractDocumentStatus = 'generating' | 'ready' | 'failed';
+
+export type ContractDocument = {
+  id: string;
+  organization_id: string;
+  contract_id: string;
+  document_type: ContractDocumentType;
+  version: number;
+  status: ContractDocumentStatus;
+  bucket_id: 'contracts';
+  storage_path: string;
+  file_name: string;
+  generated_at: string | null;
+  generated_by: string | null;
+  generation_reason: string | null;
+  metadata: Record<string, unknown>;
+  is_current: boolean;
+  created_at: string;
+};
+
+export type OrganizationContractSettings = {
+  organization_id: string;
+  legal_name: string;
+  tax_id: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  logo_storage_path: string | null;
+  city: string | null;
+  default_venue: string | null;
+};
+
+export const deliveryChecklistKeys = [
+  'screen', 'face_id', 'cameras', 'microphones', 'speakers', 'buttons',
+  'connectors', 'housing', 'battery', 'wifi', 'bluetooth', 'mobile_data',
+  'cable', 'charger', 'box', 'case', 'screen_protector',
+] as const;
+
+export type DeliveryChecklistKey = (typeof deliveryChecklistKeys)[number];
+export type DeliveryChecklist = Record<DeliveryChecklistKey, boolean> & { notes: string };
 
 export type InstallmentStatus =
   | 'pending'

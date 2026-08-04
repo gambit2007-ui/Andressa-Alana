@@ -2,7 +2,24 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/contracts/:id/generate-pdf",
+      "destination": "/api/generate-contract-pdf?id=:id"
+    },
+    {
+      "source": "/api/contracts/:id/generate-delivery-term",
+      "destination": "/api/generate-delivery-term?id=:id"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

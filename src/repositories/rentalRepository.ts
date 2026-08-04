@@ -5,13 +5,22 @@ import type {
   Client,
   ClientDocumentKind,
   Contract,
+  ContractDocument,
+  ContractDocumentType,
   Device,
   Installment,
   MdmCommand,
   MdmDevice,
   Payment,
+  OrganizationContractSettings,
 } from '../types';
-import type { CashTransactionFormData, ClientFormData, ContractFormData, DeviceFormData } from '../schemas/forms';
+import type {
+  CashTransactionFormData,
+  ClientFormData,
+  ContractFormData,
+  DeviceFormData,
+  OrganizationContractSettingsFormData,
+} from '../schemas/forms';
 
 const db = () => {
   if (!supabase) throw new Error('Supabase nao configurado.');
@@ -36,6 +45,7 @@ const normalizeDevice = (row: Device): Device => ({
   battery_health: Number(row.battery_health),
   purchase_amount: toMoney(row.purchase_amount),
   market_value: toMoney(row.market_value),
+  indemnity_value: row.indemnity_value == null ? null : toMoney(row.indemnity_value),
   accessories: Array.isArray(row.accessories) ? row.accessories : [],
 });
 
@@ -46,6 +56,7 @@ const normalizeContract = (row: Contract): Contract => ({
   monthly_amount: toMoney(row.monthly_amount),
   deposit_amount: toMoney(row.deposit_amount),
   deposit_as_first_installment: Boolean(row.deposit_as_first_installment),
+  indemnity_value: row.indemnity_value == null ? null : toMoney(row.indemnity_value),
   late_fee_percent: toMoney(row.late_fee_percent),
   daily_interest_percent: toMoney(row.daily_interest_percent),
   purchase_option_amount: row.purchase_option_amount === null ? null : toMoney(row.purchase_option_amount),
@@ -68,27 +79,39 @@ export async function listClients(): Promise<Client[]> {
   return ((data ?? []) as unknown as Client[]).map(normalizeClient);
 }
 
-export async function createClient(organizationId: string, values: ClientFormData): Promise<Client> {
+const clientWritePayload = (values: ClientFormData) => {
   const riskScore = Number(values.internal_risk_score);
-  const riskLabel = riskScore >= 800 ? 'baixo' : riskScore >= 600 ? 'moderado' : riskScore >= 400 ? 'atencao' : 'alto';
-  const { data, error } = await db().from('rental_clients').insert({
-    organization_id: organizationId,
+  return {
     full_name: values.full_name,
     cpf: values.cpf.replace(/\D/g, ''),
     rg: values.rg || null,
+    birth_date: values.birth_date || null,
     phone: values.phone,
+    secondary_phone: values.secondary_phone || null,
     email: values.email || null,
     profession: values.profession || null,
     monthly_income: values.monthly_income,
     address_line: values.address_line || null,
     address_number: values.address_number || null,
+    address_complement: values.address_complement || null,
     neighborhood: values.neighborhood || null,
     city: values.city || null,
     state: values.state?.toUpperCase() || null,
     postal_code: values.postal_code || null,
+    work_address: values.work_address || null,
+    reference_name: values.reference_name || null,
+    reference_phone: values.reference_phone || null,
     internal_risk_score: riskScore,
-    risk_label: riskLabel,
+    risk_label: riskScore >= 800 ? 'baixo' : riskScore >= 600 ? 'moderado' : riskScore >= 400 ? 'atencao' : 'alto',
     notes: values.notes || null,
+  };
+};
+
+export async function createClient(organizationId: string, values: ClientFormData): Promise<Client> {
+  const payload = clientWritePayload(values);
+  const { data, error } = await db().from('rental_clients').insert({
+    organization_id: organizationId,
+    ...payload,
   }).select('*').single();
   throwIfError(error);
   const client = normalizeClient(data as unknown as Client);
@@ -96,10 +119,33 @@ export async function createClient(organizationId: string, values: ClientFormDat
   const { error: riskError } = await db().from('client_risk_assessments').insert({
     organization_id: organizationId,
     client_id: client.id,
-    score: riskScore,
-    classification: riskLabel,
+    score: payload.internal_risk_score,
+    classification: payload.risk_label,
     source: 'internal',
     notes: 'Classificacao interna da GR Solution; nao representa score de bureau.',
+  });
+  throwIfError(riskError);
+  return client;
+}
+
+export async function updateClient(organizationId: string, clientId: string, values: ClientFormData): Promise<Client> {
+  const payload = clientWritePayload(values);
+  const { data, error } = await db().from('rental_clients')
+    .update(payload)
+    .eq('organization_id', organizationId)
+    .eq('id', clientId)
+    .select('*')
+    .single();
+  throwIfError(error);
+  const client = normalizeClient(data as unknown as Client);
+
+  const { error: riskError } = await db().from('client_risk_assessments').insert({
+    organization_id: organizationId,
+    client_id: clientId,
+    score: payload.internal_risk_score,
+    classification: payload.risk_label,
+    source: 'internal',
+    notes: 'Classificacao atualizada pelo painel.',
   });
   throwIfError(riskError);
   return client;
@@ -152,7 +198,10 @@ const deviceWritePayload = (values: DeviceFormData) => ({
   invoice_number: values.invoice_number || null,
   warranty_until: values.warranty_until || null,
   condition: values.condition,
+  accessories: values.accessories.split(',').map((item) => item.trim()).filter(Boolean),
   market_value: values.market_value,
+  indemnity_value: values.indemnity_value,
+  notes: values.notes || null,
   apple_business_registered: values.mdm_enrolled,
   mdm_enrolled: values.mdm_enrolled,
 });
@@ -189,26 +238,34 @@ export async function listContracts(): Promise<Contract[]> {
 }
 
 export async function createContract(organizationId: string, values: ContractFormData): Promise<string> {
-  const { data, error } = await db().rpc('create_contract_with_installments', {
+  const { data, error } = await db().rpc('create_contract_with_separate_deposit', {
     p_organization_id: organizationId,
     p_client_id: values.client_id,
     p_device_id: values.device_id,
     p_start_date: values.start_date,
+    p_first_installment_date: values.first_installment_date,
     p_due_day: values.due_day,
     p_term_months: values.term_months,
     p_monthly_amount: values.monthly_amount,
     p_deposit_amount: values.deposit_amount,
+    p_deposit_paid_at: values.deposit_amount > 0 ? values.deposit_paid_at : null,
+    p_deposit_payment_method: values.deposit_amount > 0 ? values.deposit_payment_method : null,
     p_late_fee_percent: values.late_fee_percent,
     p_daily_interest_percent: values.daily_interest_percent,
+    p_indemnity_value: values.indemnity_value,
     p_purchase_option: values.purchase_option,
     p_purchase_option_amount: values.purchase_option ? values.purchase_option_amount : null,
+    p_delivery_checklist: values.delivery_checklist,
   });
   throwIfError(error);
   return String(data);
 }
 
-export async function updateContract(contractId: string, values: ContractFormData): Promise<string> {
-  const { data, error } = await db().rpc('update_contract_with_installments', {
+export async function updateContract(contractId: string, values: ContractFormData, legacyMode = false): Promise<string> {
+  const functionName = legacyMode
+    ? 'update_contract_with_installments'
+    : 'update_contract_with_separate_deposit';
+  const commonPayload = {
     p_contract_id: contractId,
     p_client_id: values.client_id,
     p_device_id: values.device_id,
@@ -221,9 +278,98 @@ export async function updateContract(contractId: string, values: ContractFormDat
     p_daily_interest_percent: values.daily_interest_percent,
     p_purchase_option: values.purchase_option,
     p_purchase_option_amount: values.purchase_option ? values.purchase_option_amount : null,
-  });
+  };
+  const payload = legacyMode ? commonPayload : {
+    ...commonPayload,
+    p_first_installment_date: values.first_installment_date,
+    p_deposit_paid_at: values.deposit_amount > 0 ? values.deposit_paid_at : null,
+    p_deposit_payment_method: values.deposit_amount > 0 ? values.deposit_payment_method : null,
+    p_indemnity_value: values.indemnity_value,
+    p_delivery_checklist: values.delivery_checklist,
+  };
+  const { data, error } = await db().rpc(functionName, payload);
   throwIfError(error);
   return String(data);
+}
+
+export async function listContractDocuments(): Promise<ContractDocument[]> {
+  const { data, error } = await db()
+    .from('contract_documents')
+    .select('*')
+    .order('version', { ascending: false });
+  throwIfError(error);
+  return (data ?? []) as unknown as ContractDocument[];
+}
+
+export async function getOrganizationContractSettings(): Promise<OrganizationContractSettings | null> {
+  const { data, error } = await db()
+    .from('organization_contract_settings')
+    .select('*')
+    .maybeSingle();
+  throwIfError(error);
+  return data as OrganizationContractSettings | null;
+}
+
+export async function saveOrganizationContractSettings(
+  organizationId: string,
+  values: OrganizationContractSettingsFormData,
+): Promise<OrganizationContractSettings> {
+  const { data, error } = await db()
+    .from('organization_contract_settings')
+    .upsert({
+      organization_id: organizationId,
+      legal_name: values.legal_name,
+      tax_id: values.tax_id || null,
+      address: values.address || null,
+      phone: values.phone || null,
+      email: values.email || null,
+      city: values.city || null,
+      default_venue: values.default_venue || null,
+    }, { onConflict: 'organization_id' })
+    .select('*')
+    .single();
+  throwIfError(error);
+  return data as OrganizationContractSettings;
+}
+
+export async function generateContractDocument(
+  contractId: string,
+  documentType: ContractDocumentType,
+  reason?: string,
+): Promise<ContractDocument> {
+  const { data: sessionData, error: sessionError } = await db().auth.getSession();
+  throwIfError(sessionError);
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error('Sua sessao expirou. Entre novamente.');
+
+  const endpoint = documentType === 'rental_contract' ? 'generate-pdf' : 'generate-delivery-term';
+  const response = await fetch(`/api/contracts/${contractId}/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ reason: reason?.trim() || null }),
+  });
+  const result = await response.json().catch(() => null) as { document?: ContractDocument; error?: string } | null;
+  if (!response.ok || !result?.document) {
+    throw new Error(result?.error || 'Nao foi possivel gerar o documento.');
+  }
+  return result.document;
+}
+
+export async function createContractDocumentSignedUrl(
+  document: ContractDocument,
+  download = false,
+): Promise<string> {
+  const { data, error } = await db().storage.from(document.bucket_id).createSignedUrl(
+    document.storage_path,
+    300,
+    download ? { download: document.file_name } : undefined,
+  );
+  throwIfError(error);
+  if (!data?.signedUrl) throw new Error('Nao foi possivel criar o link seguro.');
+  return data.signedUrl;
 }
 
 export async function listInstallments(): Promise<Installment[]> {
