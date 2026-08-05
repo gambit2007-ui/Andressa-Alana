@@ -7,7 +7,7 @@ import {
   type PDFImage,
   type PDFPage,
 } from 'pdf-lib';
-import { sanitizePdfText } from './formatters';
+import { sanitizePdfText } from './formatters.js';
 
 const NAVY = rgb(0.03, 0.08, 0.17);
 const GOLD = rgb(0.74, 0.55, 0.22);
@@ -197,12 +197,12 @@ export class ContractPdfWriter {
   async save(metadata: { title: string; contractNumber: string; clientName: string }): Promise<Uint8Array> {
     this.document.setTitle(metadata.title);
     this.document.setSubject(`Contrato ${metadata.contractNumber}`);
-    this.document.setAuthor('GR Solution');
+    this.document.setAuthor('Vantage iPhones');
     const pages = this.document.getPages();
     pages.forEach((page, index) => {
       const { width } = page.getSize();
       page.drawLine({ start: { x: this.margin, y: 42 }, end: { x: width - this.margin, y: 42 }, thickness: 0.5, color: rgb(0.82, 0.84, 0.87) });
-      page.drawText(`GR SOLUTION  |  ${sanitizePdfText(metadata.contractNumber)}  |  ${sanitizePdfText(metadata.clientName)}`, {
+      page.drawText(`VANTAGE IPHONES  |  ${sanitizePdfText(metadata.contractNumber)}  |  ${sanitizePdfText(metadata.clientName)}`, {
         x: this.margin, y: 27, size: 6.5, font: this.regular, color: SLATE,
       });
       page.drawText(`Página ${index + 1} de ${pages.length}`, {

@@ -1,5 +1,5 @@
-import type { ApiRequest, ApiResponse } from '../http-types';
-import { DocumentServiceError, generateAndStoreContractDocument } from './document-service';
+import type { ApiRequest, ApiResponse } from '../http-types.js';
+import { DocumentServiceError, generateAndStoreContractDocument } from './document-service.js';
 
 export async function handleContractDocumentRequest(
   request: ApiRequest,

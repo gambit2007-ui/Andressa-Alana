@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  ShoppingBag,
   Smartphone,
   Users,
   WalletCards,
@@ -30,36 +31,43 @@ const navigation = [
   { to: '/devices', label: 'Frota de iPhones', icon: Smartphone },
   { to: '/clients', label: 'Clientes', icon: Users },
   { to: '/contracts', label: 'Contratos', icon: FileText },
+  { to: '/sales', label: 'Vendas', icon: ShoppingBag },
   { to: '/finance', label: 'Financeiro', icon: WalletCards },
   { to: '/profitability', label: 'Rentabilidade', icon: BarChart3 },
   { to: '/mdm', label: 'Apple & MDM', icon: ShieldCheck },
   { to: '/audit', label: 'Auditoria', icon: ClipboardList },
 ] as const;
 
+function VantageBrand({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <div className={`vantage-symbol ${compact ? 'vantage-symbol-compact' : ''}`}>
+        <img src="/vantage-brand.jpg" alt="" />
+      </div>
+      <div className="min-w-0">
+        <p className={`vantage-wordmark ${compact ? 'text-base' : 'text-xl'} text-white`}>Vantage</p>
+        <p className="vantage-submark">iPhones</p>
+      </div>
+    </div>
+  );
+}
+
 function SidebarContent({ close }: { close?: () => void }) {
   const { profile, signOut } = useAuth();
-  const organizationName = profile.organization?.name ?? 'GR Solution';
+  const organizationName = profile.organization?.name ?? 'Vantage iPhones';
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
-      <div className="pointer-events-none absolute -right-16 top-20 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 top-20 h-40 w-40 rounded-full bg-blue-400/10 blur-3xl" />
       <div className="relative flex items-center justify-between px-5 py-6">
-        <div className="flex items-center gap-3">
-          <div className="brand-mark">
-            <span className="font-display text-lg">GR</span>
-          </div>
-          <div>
-            <p className="font-display text-xl leading-none text-white">GR Solution</p>
-            <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.3em] text-amber-200">Rental</p>
-          </div>
-        </div>
+        <VantageBrand />
         {close && <button type="button" onClick={close} aria-label="Fechar menu" className="rounded-xl p-2.5 text-slate-400 transition hover:bg-white/10 hover:text-white"><X className="h-5 w-5" /></button>}
       </div>
 
       <div className="relative px-4">
         <div className="sidebar-organization">
           <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,.1)]" />
-          <p className="truncate text-xs font-bold text-slate-200">{organizationName}</p>
+          <div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-gold-300">Operacao online</p><p className="mt-0.5 truncate text-xs font-bold text-slate-200">{organizationName}</p></div>
         </div>
       </div>
 
@@ -110,12 +118,10 @@ export default function AppShell() {
       </aside>
 
       <header className="mobile-topbar lg:hidden">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="brand-mark brand-mark-mobile"><span className="font-display text-sm">GR</span></div>
-          <div className="min-w-0">
-            <p className="truncate font-display text-lg leading-none text-slate-950">GR Solution</p>
-            <p className="mt-1 truncate text-[9px] font-extrabold uppercase tracking-[0.18em] text-slate-500">{currentSection?.label ?? 'Rental'}</p>
-          </div>
+        <div className="flex min-w-0 items-center gap-4">
+          <VantageBrand compact />
+          <span className="hidden h-7 w-px bg-slate-200 min-[420px]:block" />
+          <p className="hidden truncate text-[9px] font-extrabold uppercase tracking-[0.18em] text-slate-500 min-[420px]:block">{currentSection?.label ?? 'Gestao'}</p>
         </div>
         <button type="button" onClick={() => setMenuOpen(true)} aria-label="Abrir menu" className="rounded-xl border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm">
           <Menu className="h-5 w-5" />

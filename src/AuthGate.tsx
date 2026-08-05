@@ -31,38 +31,11 @@ const authErrorMessage = (message: string): string => {
 function BrandPanel() {
   return (
     <section className="auth-brand-panel">
-      <div className="relative z-10 flex h-full flex-col justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-400/20">
-            <span className="font-display text-xl">GR</span>
-          </div>
-          <div>
-            <p className="font-display text-2xl leading-none text-white">GR Solution</p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.28em] text-cyan-300">Rental Operations</p>
-          </div>
-        </div>
-
-        <div className="max-w-md space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">
-            <ShieldCheck className="h-4 w-4 text-cyan-300" />
-            Operacao protegida por Supabase Auth
-          </div>
-          <h1 className="font-display text-5xl leading-[1.02] text-white sm:text-6xl">
-            Sua frota sob controle. Do IMEI ao caixa.
-          </h1>
-          <p className="max-w-sm text-sm leading-6 text-slate-400">
-            Contratos, cobranca, rentabilidade e MDM em uma unica operacao auditavel.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 text-xs text-slate-400">
-          {['Frota', 'Financeiro', 'MDM'].map((item) => (
-            <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-              <Smartphone className="mb-2 h-4 w-4 text-cyan-300" />
-              {item}
-            </div>
-          ))}
-        </div>
+      <img className="auth-brand-visual" src="/vantage-brand.jpg" alt="Vantage iPhones - Seu melhor upgrade" />
+      <div className="auth-brand-sheen" />
+      <div className="auth-brand-badge"><ShieldCheck className="h-4 w-4" />Gestao segura de locacoes</div>
+      <div className="auth-brand-footer">
+        {['Frota', 'Contratos', 'Financeiro'].map((item) => <span key={item}><Smartphone className="h-3.5 w-3.5" />{item}</span>)}
       </div>
     </section>
   );
@@ -71,10 +44,10 @@ function BrandPanel() {
 function MobileBrand() {
   return (
     <div className="auth-mobile-brand">
-      <div className="brand-mark brand-mark-mobile"><span className="font-display text-sm">GR</span></div>
+      <div className="vantage-symbol vantage-symbol-login"><img src="/vantage-brand.jpg" alt="" /></div>
       <div>
-        <p className="font-display text-xl leading-none text-slate-950">GR Solution</p>
-        <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.24em] text-gold-500">Rental</p>
+        <p className="vantage-wordmark text-xl text-navy-900">Vantage</p>
+        <p className="vantage-submark text-gold-500">iPhones</p>
       </div>
     </div>
   );
@@ -119,7 +92,7 @@ function AuthForm({ onRecovery }: { onRecovery: () => void }) {
     <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
       <MobileBrand />
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-700">Area segura</p>
+        <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-700">Area segura</p>
         <h2 className="mt-2 font-display text-4xl text-slate-950">
           {forgotMode ? 'Recuperar acesso' : 'Bem-vindo de volta'}
         </h2>
@@ -138,7 +111,7 @@ function AuthForm({ onRecovery }: { onRecovery: () => void }) {
           <span>Email</span>
           <div className="relative">
             <Mail className="input-icon" />
-            <input className="input pl-11" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@grsolution.com" />
+            <input className="input pl-11" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@vantageiphones.com" />
           </div>
         </label>
 
@@ -158,7 +131,7 @@ function AuthForm({ onRecovery }: { onRecovery: () => void }) {
         {forgotMode ? 'Enviar link' : 'Entrar na operacao'}
       </button>
 
-      <button type="button" className="w-full text-sm font-semibold text-slate-500 transition hover:text-cyan-700" onClick={() => {
+      <button type="button" className="w-full text-sm font-semibold text-slate-500 transition hover:text-blue-700" onClick={() => {
         setForgotMode((current) => !current);
         setError(null);
         setMessage(null);
@@ -188,7 +161,7 @@ function PasswordRecovery({ onDone }: { onDone: () => void }) {
     <form onSubmit={submit} className="w-full max-w-md space-y-6">
       <MobileBrand />
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-cyan-700">Recuperacao</p>
+        <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-700">Recuperacao</p>
         <h2 className="mt-2 font-display text-4xl text-slate-950">Crie uma nova senha</h2>
       </div>
       {error && <div className="alert alert-error">{error}</div>}
@@ -298,7 +271,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return (
       <main className="auth-layout">
         <BrandPanel />
-        <section className="grid min-h-screen place-items-center bg-stone-50 p-6 sm:p-10">
+        <section className="auth-form-panel grid min-h-screen place-items-center p-6 sm:p-10">
           {recoveryMode ? <PasswordRecovery onDone={() => setRecoveryMode(false)} /> : <AuthForm onRecovery={() => setRecoveryMode(true)} />}
         </section>
       </main>

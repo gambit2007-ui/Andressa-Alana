@@ -1,11 +1,25 @@
-import type { ContractFinancialSummary, ContractInstallment, ContractPdfData } from './types';
-import { calculateContractPlan, roundMoney } from '../../../src/domain/contractPlan';
-import { formatCurrency } from './formatters';
+import type { ContractFinancialSummary, ContractInstallment, ContractPdfData } from './types.js';
+import { calculateContractPlan, roundMoney } from '../../../src/domain/contractPlan.js';
+import { formatCurrency } from './formatters.js';
 
 export type ContractSection = { title: string; paragraphs: string[] };
 
+const installmentStatusLabels: Record<string, string> = {
+  pending: 'Pendente',
+  partial: 'Parcial',
+  overdue: 'Atrasada',
+  paid: 'Paga',
+  cancelled: 'Cancelada',
+  renegotiated: 'Renegociada',
+};
+
+export function formatInstallmentStatus(status: string): string {
+  return installmentStatusLabels[status.toLowerCase()] ?? status;
+}
+
 export function calculateFinancialSummary(input: {
   depositAmount: number;
+  depositAsFirstInstallment?: boolean;
   monthlyAmount: number;
   installmentCount: number;
   installments: ContractInstallment[];
@@ -15,11 +29,15 @@ export function calculateFinancialSummary(input: {
   purchaseOptionAmount: number | null;
 }): ContractFinancialSummary {
   const paidInstallments = roundMoney(input.installments.reduce((sum, item) => sum + item.paidAmount, 0));
+  const legacyDepositPayment = input.depositAsFirstInstallment
+    ? input.installments.find((item) => item.number === 1)?.paidAmount ?? 0
+    : 0;
+  const paidMonthlyInstallments = roundMoney(Math.max(0, paidInstallments - legacyDepositPayment));
   const plan = calculateContractPlan({
     monthlyInstallments: input.installmentCount,
     monthlyAmount: input.monthlyAmount,
     depositAmount: input.depositAmount,
-    paidInstallmentsAmount: paidInstallments,
+    paidInstallmentsAmount: paidMonthlyInstallments,
   });
   return {
     depositAmount: plan.depositAmount,

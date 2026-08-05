@@ -160,7 +160,7 @@ export default function ClientsPage() {
               <label className="form-field sm:col-span-3"><span>Contato de referencia</span><input className="input" {...form.register('reference_name')} /></label>
               <label className="form-field sm:col-span-3"><span>Telefone da referencia</span><input className="input" {...form.register('reference_phone')} /></label>
             </div>
-            <label className="form-field"><span>Classificacao interna: {form.watch('internal_risk_score')}</span><input type="range" min="0" max="1000" className="w-full accent-cyan-700" {...form.register('internal_risk_score', { valueAsNumber: true })} /><small className="font-normal text-slate-500">Uso interno da GR Solution. Nao equivale a score oficial de credito.</small></label>
+            <label className="form-field"><span>Classificacao interna: {form.watch('internal_risk_score')}</span><input type="range" min="0" max="1000" className="w-full accent-cyan-700" {...form.register('internal_risk_score', { valueAsNumber: true })} /><small className="font-normal text-slate-500">Uso interno da Vantage iPhones. Nao equivale a score oficial de credito.</small></label>
             <label className="form-field"><span>Observacoes</span><textarea className="input min-h-24" {...form.register('notes')} /></label>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4">

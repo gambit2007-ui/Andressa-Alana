@@ -9,7 +9,7 @@ import {
   calculateProjectedResidualValue,
   isOperationalExpense,
 } from '../../domain/fleetFinance';
-import { listCashTransactions, listDevices, listInstallments } from '../../repositories/rentalRepository';
+import { listCashTransactions, listDevices, listDeviceSales, listInstallments } from '../../repositories/rentalRepository';
 import { formatCurrency, formatMonths, formatPercentage } from '../../utils/formatters';
 
 export default function ProfitabilityPage() {
@@ -18,12 +18,13 @@ export default function ProfitabilityPage() {
   const query = useQuery({
     queryKey: ['profitability'],
     queryFn: async () => {
-      const [devices, installments, transactions] = await Promise.all([
+      const [devices, installments, transactions, sales] = await Promise.all([
         listDevices(),
         listInstallments(),
         listCashTransactions(),
+        listDeviceSales(),
       ]);
-      return { devices, installments, transactions };
+      return { devices, installments, transactions, sales };
     },
   });
 
@@ -37,16 +38,20 @@ export default function ProfitabilityPage() {
         installment.contract?.device_id === device.id
         && installment.contract.status !== 'cancelled'
       ));
-      const revenueReceived = deviceInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0);
+      const rentalRevenue = deviceInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0);
+      const directSale = query.data.sales.find((sale) => sale.device_id === device.id && sale.paid_in_full);
+      const saleRevenue = directSale?.sale_amount ?? 0;
+      const revenueReceived = rentalRevenue + saleRevenue;
       const deviceOperationalTransactions = operationalTransactions.filter((transaction) => transaction.device_id === device.id);
       const operationalExpenses = deviceOperationalTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
       const months = Math.max(1, differenceInMonths(now, parseISO(device.purchase_date)));
-      const averageMonthlyRevenue = revenueReceived / months;
+      const averageMonthlyRevenue = rentalRevenue / months;
+      const currentMarketValue = directSale || device.status === 'sold' ? 0 : device.market_value;
       const metrics = calculateAssetMetrics({
         revenueReceived,
         operationalExpenses,
         purchaseValue: device.purchase_amount,
-        currentMarketValue: device.market_value,
+        currentMarketValue,
         averageMonthlyRevenue,
       });
       const projectedResidualValue = calculateProjectedResidualValue(
@@ -93,6 +98,9 @@ export default function ProfitabilityPage() {
         months,
         metrics,
         projectedResidualValue,
+        rentalRevenue,
+        saleRevenue,
+        directSale,
         recommendation,
         recommendationTone,
       };
@@ -116,13 +124,18 @@ export default function ProfitabilityPage() {
     const validInstallments = query.data.installments.filter((installment) => (
       installment.contract?.status !== 'cancelled'
     ));
+    const directSalesRevenue = query.data.sales
+      .filter((sale) => sale.paid_in_full)
+      .reduce((sum, sale) => sum + sale.sale_amount, 0);
     return calculateFleetMetrics({
       capitalInvested: query.data.devices.reduce((sum, device) => sum + device.purchase_amount, 0),
-      revenuesReceived: validInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0),
+      revenuesReceived: validInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0) + directSalesRevenue,
       operationalExpenses: query.data.transactions
         .filter(isOperationalExpense)
         .reduce((sum, transaction) => sum + transaction.amount, 0),
-      currentFleetValue: query.data.devices.reduce((sum, device) => sum + device.market_value, 0),
+      currentFleetValue: query.data.devices
+        .filter((device) => device.status !== 'sold')
+        .reduce((sum, device) => sum + device.market_value, 0),
     });
   }, [query.data]);
 
@@ -159,7 +172,7 @@ export default function ProfitabilityPage() {
         <article className="metric-card border-emerald-200/80 bg-emerald-50/50">
           <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Receitas recebidas</p>
           <p className="mt-2 text-xl font-extrabold text-emerald-700">{formatCurrency(totals.revenuesReceived)}</p>
-          <p className="mt-2 text-xs text-emerald-700/70">Somente alugueis efetivamente pagos</p>
+          <p className="mt-2 text-xs text-emerald-700/70">Locacoes e vendas efetivamente recebidas</p>
         </article>
         <article className="metric-card border-amber-200/80 bg-amber-50/50">
           <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">Despesas operacionais</p>
@@ -207,7 +220,7 @@ export default function ProfitabilityPage() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl bg-emerald-50/70 p-3"><p className="text-[10px] text-emerald-700">Alugueis recebidos</p><p className="mt-1 text-sm font-extrabold text-emerald-700">{formatCurrency(row.metrics.revenueReceived)}</p></div>
+                  <div className="rounded-xl bg-emerald-50/70 p-3"><p className="text-[10px] text-emerald-700">Receita recebida</p><p className="mt-1 text-sm font-extrabold text-emerald-700">{formatCurrency(row.metrics.revenueReceived)}</p><p className="mt-1 text-[9px] text-emerald-700/70">Locacao {formatCurrency(row.rentalRevenue)}{row.saleRevenue > 0 ? ` + venda ${formatCurrency(row.saleRevenue)}` : ''}</p></div>
                   <div className="rounded-xl bg-amber-50/70 p-3"><p className="text-[10px] text-amber-700">Despesas operacionais</p><p className="mt-1 text-sm font-extrabold text-amber-800">{formatCurrency(row.metrics.operationalExpenses)}</p></div>
                   <div className={`rounded-xl p-3 ${profitPositive ? 'bg-emerald-50/70' : 'bg-red-50/70'}`}><p className={`text-[10px] ${profitPositive ? 'text-emerald-700' : 'text-red-700'}`}>Lucro operacional</p><p className={`mt-1 text-sm font-extrabold ${profitPositive ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(row.metrics.operationalProfit)}</p></div>
                   <div className="rounded-xl bg-cyan-50/70 p-3"><p className="text-[10px] text-cyan-700">ROI operacional</p><p className="mt-1 text-sm font-extrabold text-cyan-700">{formatPercentage(row.metrics.operationalRoi)}</p></div>
@@ -215,14 +228,14 @@ export default function ProfitabilityPage() {
 
                 <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-xs sm:grid-cols-4">
                   <div><p className="text-slate-400">Valor de compra</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.metrics.purchaseValue)}</p></div>
-                  <div><p className="text-slate-400">Valor de mercado atual</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.metrics.currentMarketValue)}</p></div>
+                  <div><p className="text-slate-400">{row.directSale ? 'Valor realizado na venda' : 'Valor de mercado atual'}</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.directSale?.sale_amount ?? row.metrics.currentMarketValue)}</p></div>
                   <div><p className="text-slate-400">Depreciacao acumulada</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.metrics.accumulatedDepreciation)}</p></div>
-                  <div><p className="text-slate-400">Tempo restante para recuperar o investimento</p><p className="mt-1 font-bold text-slate-800">{formatMonths(row.metrics.remainingPaybackMonths)}</p></div>
+                  <div><p className="text-slate-400">Tempo restante para recuperar o investimento</p><p className="mt-1 font-bold text-slate-800">{row.directSale ? 'Venda encerrada' : formatMonths(row.metrics.remainingPaybackMonths)}</p></div>
                 </div>
 
                 <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-slate-500">Resultado economico <strong className={row.metrics.economicResult >= 0 ? 'text-emerald-700' : 'text-red-700'}>{formatCurrency(row.metrics.economicResult)}</strong></p>
-                  <p className="text-slate-500">Residual projetado a {depreciationRate}% a.a. <strong className="text-slate-800">{formatCurrency(row.projectedResidualValue)}</strong></p>
+                  <p className="text-slate-500">{row.directSale ? 'Venda efetivada' : `Residual projetado a ${depreciationRate}% a.a.`} <strong className="text-slate-800">{formatCurrency(row.directSale?.sale_amount ?? row.projectedResidualValue)}</strong></p>
                 </div>
 
                 {row.device.battery_health < 85 ? (

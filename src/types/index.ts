@@ -82,6 +82,23 @@ export type Device = {
   created_at: string;
 };
 
+export type DeviceSale = {
+  id: string;
+  organization_id: string;
+  device_id: string;
+  contract_id: string | null;
+  client_id: string | null;
+  sale_amount: number;
+  sold_at: string;
+  payment_method: PaymentMethod;
+  paid_in_full: boolean;
+  apple_release_confirmed: boolean;
+  notes: string | null;
+  created_at: string;
+  client?: Pick<Client, 'id' | 'full_name' | 'cpf'>;
+  device?: Pick<Device, 'id' | 'model' | 'serial_number' | 'status' | 'purchase_amount' | 'mdm_enrolled'>;
+};
+
 export type ContractStatus =
   | 'draft'
   | 'active'
@@ -205,6 +222,7 @@ export type CashTransaction = {
   organization_id: string;
   device_id: string | null;
   contract_id: string | null;
+  device_sale_id?: string | null;
   kind: string;
   direction: 'in' | 'out';
   amount: number;

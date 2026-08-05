@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { generateContractPdf } from './generate-contract-pdf';
-import { generateDeliveryTermPdf } from './generate-delivery-term-pdf';
-import type { ContractPdfData } from './types';
+import { generateContractPdf } from './generate-contract-pdf.js';
+import { generateDeliveryTermPdf } from './generate-delivery-term-pdf.js';
+import type { ContractPdfData } from './types.js';
 
 const data: ContractPdfData = {
   contractId: '9c00f4dd-bbf9-4d50-b47e-ea7ec953351b', contractNumber: 'GR-2026-PDF',

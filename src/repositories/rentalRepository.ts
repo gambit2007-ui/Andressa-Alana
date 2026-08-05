@@ -8,6 +8,7 @@ import type {
   ContractDocument,
   ContractDocumentType,
   Device,
+  DeviceSale,
   Installment,
   MdmCommand,
   MdmDevice,
@@ -18,6 +19,7 @@ import type {
   CashTransactionFormData,
   ClientFormData,
   ContractFormData,
+  DirectDeviceSaleFormData,
   DeviceFormData,
   OrganizationContractSettingsFormData,
 } from '../schemas/forms';
@@ -47,6 +49,12 @@ const normalizeDevice = (row: Device): Device => ({
   market_value: toMoney(row.market_value),
   indemnity_value: row.indemnity_value == null ? null : toMoney(row.indemnity_value),
   accessories: Array.isArray(row.accessories) ? row.accessories : [],
+});
+
+const normalizeDeviceSale = (row: DeviceSale): DeviceSale => ({
+  ...row,
+  sale_amount: toMoney(row.sale_amount),
+  device: row.device ? { ...row.device, purchase_amount: toMoney(row.device.purchase_amount) } : undefined,
 });
 
 const normalizeContract = (row: Contract): Contract => ({
@@ -122,7 +130,7 @@ export async function createClient(organizationId: string, values: ClientFormDat
     score: payload.internal_risk_score,
     classification: payload.risk_label,
     source: 'internal',
-    notes: 'Classificacao interna da GR Solution; nao representa score de bureau.',
+    notes: 'Classificacao interna da Vantage iPhones; nao representa score de bureau.',
   });
   throwIfError(riskError);
   return client;
@@ -226,6 +234,34 @@ export async function updateDevice(organizationId: string, deviceId: string, val
     .single();
   throwIfError(error);
   return normalizeDevice(data as unknown as Device);
+}
+
+export async function listDeviceSales(): Promise<DeviceSale[]> {
+  const { data, error } = await db()
+    .from('device_sales')
+    .select('*,client:rental_clients(id,full_name,cpf),device:devices(id,model,serial_number,status,purchase_amount,mdm_enrolled)')
+    .order('sold_at', { ascending: false });
+  throwIfError(error);
+  return ((data ?? []) as unknown as DeviceSale[]).map(normalizeDeviceSale);
+}
+
+export async function createDirectDeviceSale(
+  organizationId: string,
+  values: DirectDeviceSaleFormData,
+): Promise<string> {
+  const { data, error } = await db().rpc('create_direct_device_sale', {
+    p_organization_id: organizationId,
+    p_device_id: values.device_id,
+    p_client_id: values.client_id,
+    p_sale_amount: values.sale_amount,
+    p_sold_at: new Date(values.sold_at).toISOString(),
+    p_payment_method: values.payment_method,
+    p_serial_confirmation: values.serial_confirmation.trim().toUpperCase(),
+    p_apple_release_confirmed: values.apple_release_confirmed,
+    p_notes: values.notes?.trim() || null,
+  });
+  throwIfError(error);
+  return String(data);
 }
 
 export async function listContracts(): Promise<Contract[]> {

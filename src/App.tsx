@@ -11,6 +11,7 @@ const DevicesPage = lazy(() => import('./features/devices/DevicesPage'));
 const FinancePage = lazy(() => import('./features/finance/FinancePage'));
 const MdmPage = lazy(() => import('./features/mdm/MdmPage'));
 const ProfitabilityPage = lazy(() => import('./features/profitability/ProfitabilityPage'));
+const SalesPage = lazy(() => import('./features/sales/SalesPage'));
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="contracts" element={<ContractsPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="profitability" element={<ProfitabilityPage />} />
+            <Route path="sales" element={<SalesPage />} />
             <Route path="mdm" element={<MdmPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

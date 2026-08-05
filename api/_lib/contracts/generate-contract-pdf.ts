@@ -1,12 +1,12 @@
-import { buildContractSections } from './content';
-import { formatCurrency, formatDate } from './formatters';
-import { ContractPdfWriter } from './pdf-writer';
-import type { ContractPdfData } from './types';
+import { buildContractSections, formatInstallmentStatus } from './content.js';
+import { formatCurrency, formatDate } from './formatters.js';
+import { ContractPdfWriter } from './pdf-writer.js';
+import type { ContractPdfData } from './types.js';
 
 export async function generateContractPdf(data: ContractPdfData): Promise<Uint8Array> {
   const pdf = await ContractPdfWriter.create();
   pdf.addCover({
-    brand: 'GR Solution',
+    brand: 'Vantage iPhones',
     title: 'Contrato de locação de smartphone',
     subtitle: `${data.device.model} | ${data.lessee.name}`,
     details: [
@@ -60,7 +60,7 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Uint8A
   pdf.table(
     ['Parcela', 'Vencimento', 'Valor', 'Status', 'Pagamento'],
     data.installments.map((item) => [
-      String(item.number), formatDate(item.dueDate), formatCurrency(item.amount), item.status,
+      String(item.number), formatDate(item.dueDate), formatCurrency(item.amount), formatInstallmentStatus(item.status),
       item.paidAt ? formatDate(item.paidAt) : 'Pendente',
     ]),
     [0.7, 1.25, 1.2, 1, 1.25],

@@ -1,15 +1,15 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { calculateFinancialSummary, canGenerateForOrganization } from './content';
-import { generateContractPdf } from './generate-contract-pdf';
-import { generateDeliveryTermPdf } from './generate-delivery-term-pdf';
+import { calculateFinancialSummary, canGenerateForOrganization } from './content.js';
+import { generateContractPdf } from './generate-contract-pdf.js';
+import { generateDeliveryTermPdf } from './generate-delivery-term-pdf.js';
 import type {
   ContractDocumentRow,
   ContractInstallment,
   ContractPdfData,
   ContractPhoto,
   DeliveryChecklist,
-} from './types';
+} from './types.js';
 
 type DocumentType = 'rental_contract' | 'delivery_term';
 
@@ -30,6 +30,7 @@ type ContractRow = {
   term_months: number | string;
   monthly_amount: number | string;
   deposit_amount: number | string;
+  deposit_as_first_installment: boolean;
   late_fee_percent: number | string;
   daily_interest_percent: number | string;
   indemnity_value: number | string | null;
@@ -204,6 +205,7 @@ async function assemblePdfData(admin: SupabaseClient, contractId: string, profil
   const settings = settingsResult.data as SettingsRow | null;
   const financial = calculateFinancialSummary({
     depositAmount: money(contract.deposit_amount),
+    depositAsFirstInstallment: Boolean(contract.deposit_as_first_installment),
     monthlyAmount: money(contract.monthly_amount),
     installmentCount: Number(contract.term_months),
     installments,

@@ -1,11 +1,11 @@
-import { formatDate } from './formatters';
-import { ContractPdfWriter } from './pdf-writer';
-import type { ContractPdfData } from './types';
+import { formatDate } from './formatters.js';
+import { ContractPdfWriter } from './pdf-writer.js';
+import type { ContractPdfData } from './types.js';
 
 export async function generateDeliveryTermPdf(data: ContractPdfData): Promise<Uint8Array> {
   const pdf = await ContractPdfWriter.create();
   pdf.addCover({
-    brand: 'GR Solution',
+    brand: 'Vantage iPhones',
     title: 'Termo de entrega do equipamento',
     subtitle: `${data.device.model} | ${data.device.serialNumber}`,
     details: [

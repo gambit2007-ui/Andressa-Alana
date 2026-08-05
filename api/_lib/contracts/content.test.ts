@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildContractSections, calculateFinancialSummary, canGenerateForOrganization, nextDocumentVersion } from './content';
-import { formatCurrency } from './formatters';
-import type { ContractPdfData } from './types';
+import { buildContractSections, calculateFinancialSummary, canGenerateForOrganization, formatInstallmentStatus, nextDocumentVersion } from './content.js';
+import { formatCurrency } from './formatters.js';
+import type { ContractPdfData } from './types.js';
 
 const baseData: ContractPdfData = {
   contractId: '9c00f4dd-bbf9-4d50-b47e-ea7ec953351b',
@@ -36,8 +36,58 @@ describe('conteudo contratual', () => {
     });
     expect(summary.totalContract).toBe(2400);
     expect(summary.monthlyTotal).toBe(1920);
+    expect(summary.amountReceived).toBe(480);
     expect(summary.remainingBalance).toBe(1920);
     expect(baseData.installments).toHaveLength(4);
+  });
+
+  it('nao soma a caucao historica duas vezes como valor recebido', () => {
+    const legacyInstallments = [
+      { number: 1, dueDate: '2026-08-03', amount: 480, status: 'paid', paidAmount: 480, paidAt: '2026-08-03' },
+      ...baseData.installments.map((item) => ({ ...item, number: item.number + 1 })),
+    ];
+    const summary = calculateFinancialSummary({
+      depositAmount: 480,
+      depositAsFirstInstallment: true,
+      monthlyAmount: 480,
+      installmentCount: 4,
+      installments: legacyInstallments,
+      lateFeePercent: 2,
+      dailyInterestPercent: 1.5,
+      purchaseOption: false,
+      purchaseOptionAmount: null,
+    });
+    expect(summary.totalContract).toBe(2400);
+    expect(summary.amountReceived).toBe(480);
+    expect(summary.remainingBalance).toBe(1920);
+  });
+
+  it('soma uma mensalidade paga quando a caucao e separada', () => {
+    const installments = baseData.installments.map((item, index) => index === 0
+      ? { ...item, status: 'paid', paidAmount: 480, paidAt: '2026-09-10' }
+      : item);
+    const summary = calculateFinancialSummary({
+      depositAmount: 480,
+      depositAsFirstInstallment: false,
+      monthlyAmount: 480,
+      installmentCount: 4,
+      installments,
+      lateFeePercent: 2,
+      dailyInterestPercent: 1.5,
+      purchaseOption: false,
+      purchaseOptionAmount: null,
+    });
+    expect(summary.amountReceived).toBe(960);
+    expect(summary.remainingBalance).toBe(1440);
+  });
+
+  it('traduz os status das mensalidades para portugues', () => {
+    expect(formatInstallmentStatus('paid')).toBe('Paga');
+    expect(formatInstallmentStatus('pending')).toBe('Pendente');
+    expect(formatInstallmentStatus('partial')).toBe('Parcial');
+    expect(formatInstallmentStatus('overdue')).toBe('Atrasada');
+    expect(formatInstallmentStatus('cancelled')).toBe('Cancelada');
+    expect(formatInstallmentStatus('renegotiated')).toBe('Renegociada');
   });
 
   it('inclui a clausula de compra somente quando ativada', () => {

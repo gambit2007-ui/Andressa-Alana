@@ -69,6 +69,17 @@ export const deviceSchema = z.object({
   mdm_enrolled: z.boolean(),
 });
 
+export const directDeviceSaleSchema = z.object({
+  device_id: requiredText('Aparelho'),
+  client_id: requiredText('Cliente'),
+  sale_amount: z.number().positive('O valor da venda deve ser maior que zero.'),
+  sold_at: requiredText('Data da venda'),
+  payment_method: z.enum(['pix', 'card', 'transfer', 'cash', 'other']),
+  serial_confirmation: requiredText('Confirmacao do numero de serie'),
+  apple_release_confirmed: z.boolean(),
+  notes: z.string().trim().max(1000, 'Use no maximo 1000 caracteres.').optional(),
+});
+
 export const contractSchema = z.object({
   client_id: requiredText('Cliente'),
   device_id: requiredText('Aparelho'),
@@ -121,6 +132,7 @@ export const cashTransactionSchema = z.object({
 
 export type ClientFormData = z.infer<typeof clientSchema>;
 export type DeviceFormData = z.infer<typeof deviceSchema>;
+export type DirectDeviceSaleFormData = z.infer<typeof directDeviceSaleSchema>;
 export type ContractFormData = z.infer<typeof contractSchema>;
 export type OrganizationContractSettingsFormData = z.infer<typeof organizationContractSettingsSchema>;
 export type CashTransactionFormData = z.infer<typeof cashTransactionSchema>;
