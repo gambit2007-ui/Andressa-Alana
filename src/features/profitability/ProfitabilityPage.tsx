@@ -20,6 +20,7 @@ import {
   calculateFleetMetrics,
   calculateProjectedResidualValue,
   isOperationalExpense,
+  isReceivedDeposit,
 } from '../../domain/fleetFinance';
 import { listCashTransactions, listDevices, listDeviceSales, listInstallments } from '../../repositories/rentalRepository';
 import { formatCurrency, formatMonths, formatPercentage } from '../../utils/formatters';
@@ -49,6 +50,7 @@ export default function ProfitabilityPage() {
     if (!query.data) return [];
     const now = new Date();
     const operationalTransactions = canonicalTransactions.filter(isOperationalExpense);
+    const depositTransactions = canonicalTransactions.filter(isReceivedDeposit);
 
     return query.data.devices.map((device) => {
       const deviceInstallments = query.data.installments.filter((installment) => (
@@ -56,13 +58,18 @@ export default function ProfitabilityPage() {
         && installment.contract.status !== 'cancelled'
       ));
       const rentalRevenue = deviceInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0);
+      const deviceContractIds = new Set(deviceInstallments.map((installment) => installment.contract_id));
+      const depositRevenue = depositTransactions
+        .filter((transaction) => transaction.device_id === device.id
+          || (transaction.contract_id !== null && deviceContractIds.has(transaction.contract_id)))
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
       const directSale = query.data.sales.find((sale) => sale.device_id === device.id && sale.paid_in_full);
       const saleRevenue = directSale?.sale_amount ?? 0;
-      const revenueReceived = rentalRevenue + saleRevenue;
+      const revenueReceived = rentalRevenue + depositRevenue + saleRevenue;
       const deviceOperationalTransactions = operationalTransactions.filter((transaction) => transaction.device_id === device.id);
       const operationalExpenses = deviceOperationalTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
       const months = Math.max(1, differenceInMonths(now, parseISO(device.purchase_date)));
-      const averageMonthlyRevenue = rentalRevenue / months;
+      const averageMonthlyRevenue = (rentalRevenue + depositRevenue) / months;
       const currentMarketValue = directSale || device.status === 'sold' ? 0 : device.market_value;
       const metrics = calculateAssetMetrics({
         revenueReceived,
@@ -116,6 +123,7 @@ export default function ProfitabilityPage() {
         metrics,
         projectedResidualValue,
         rentalRevenue,
+        depositRevenue,
         saleRevenue,
         directSale,
         recommendation,
@@ -144,9 +152,14 @@ export default function ProfitabilityPage() {
     const directSalesRevenue = query.data.sales
       .filter((sale) => sale.paid_in_full)
       .reduce((sum, sale) => sum + sale.sale_amount, 0);
+    const depositRevenue = canonicalTransactions
+      .filter(isReceivedDeposit)
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
     return calculateFleetMetrics({
       capitalInvested: query.data.devices.reduce((sum, device) => sum + device.purchase_amount, 0),
-      revenuesReceived: validInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0) + directSalesRevenue,
+      revenuesReceived: validInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0)
+        + depositRevenue
+        + directSalesRevenue,
       operationalExpenses: canonicalTransactions
         .filter(isOperationalExpense)
         .reduce((sum, transaction) => sum + transaction.amount, 0),
@@ -269,7 +282,7 @@ export default function ProfitabilityPage() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl bg-emerald-50/70 p-3"><p className="text-[10px] text-emerald-700">Receita recebida</p><p className="mt-1 text-sm font-extrabold text-emerald-700">{formatCurrency(row.metrics.revenueReceived)}</p><p className="mt-1 text-[9px] text-emerald-700/70">Locacao {formatCurrency(row.rentalRevenue)}{row.saleRevenue > 0 ? ` + venda ${formatCurrency(row.saleRevenue)}` : ''}</p></div>
+                  <div className="rounded-xl bg-emerald-50/70 p-3"><p className="text-[10px] text-emerald-700">Receita recebida</p><p className="mt-1 text-sm font-extrabold text-emerald-700">{formatCurrency(row.metrics.revenueReceived)}</p><p className="mt-1 text-[9px] text-emerald-700/70">Locacao {formatCurrency(row.rentalRevenue)}{row.depositRevenue > 0 ? ` + caucao ${formatCurrency(row.depositRevenue)}` : ''}{row.saleRevenue > 0 ? ` + venda ${formatCurrency(row.saleRevenue)}` : ''}</p></div>
                   <div className="rounded-xl bg-amber-50/70 p-3"><p className="text-[10px] text-amber-700">Despesas operacionais</p><p className="mt-1 text-sm font-extrabold text-amber-800">{formatCurrency(row.metrics.operationalExpenses)}</p></div>
                   <div className={`rounded-xl p-3 ${profitPositive ? 'bg-emerald-50/70' : 'bg-red-50/70'}`}><p className={`text-[10px] ${profitPositive ? 'text-emerald-700' : 'text-red-700'}`}>Lucro operacional</p><p className={`mt-1 text-sm font-extrabold ${profitPositive ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(row.metrics.operationalProfit)}</p></div>
                   <div className="rounded-xl bg-cyan-50/70 p-3"><p className="text-[10px] text-cyan-700">ROI operacional</p><p className="mt-1 text-sm font-extrabold text-cyan-700">{formatPercentage(row.metrics.operationalRoi)}</p></div>

@@ -52,6 +52,12 @@ export const isOperationalExpense = (
   && transaction.direction === 'out'
   && !nonOperationalOutflowKinds.has(transaction.kind);
 
+export const isReceivedDeposit = (
+  transaction: Pick<CashTransaction, 'direction' | 'kind' | 'status'>,
+): boolean => transaction.status === 'confirmed'
+  && transaction.direction === 'in'
+  && transaction.kind === 'deposit_received';
+
 export function calculateFleetMetrics(input: {
   capitalInvested: NumericValue;
   revenuesReceived: NumericValue;

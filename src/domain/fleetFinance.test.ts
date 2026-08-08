@@ -5,6 +5,7 @@ import {
   calculateFleetMetrics,
   calculateProjectedResidualValue,
   isOperationalExpense,
+  isReceivedDeposit,
   toFiniteNumber,
 } from './fleetFinance';
 
@@ -76,6 +77,18 @@ describe('metricas financeiras da frota', () => {
     expect(isOperationalExpense(transaction('supplier'))).toBe(false);
     expect(isOperationalExpense(transaction('withdrawal'))).toBe(false);
     expect(isOperationalExpense(transaction('payment_reversal'))).toBe(false);
+  });
+
+  it('reconhece caucao recebida sem duplicar pagamentos antigos', () => {
+    const transaction = (kind: string, direction: 'in' | 'out' = 'in', status: 'confirmed' | 'reversed' = 'confirmed') => ({
+      direction,
+      status,
+      kind,
+    });
+    expect(isReceivedDeposit(transaction('deposit_received'))).toBe(true);
+    expect(isReceivedDeposit(transaction('rental_payment'))).toBe(false);
+    expect(isReceivedDeposit(transaction('deposit_received', 'in', 'reversed'))).toBe(false);
+    expect(isReceivedDeposit(transaction('deposit_received', 'out'))).toBe(false);
   });
 
   it('mantem a depreciacao anual apenas como projecao patrimonial', () => {
