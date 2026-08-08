@@ -312,10 +312,71 @@ button:disabled { cursor: not-allowed; }
 }
 
 .finance-metric-card {
-  @apply min-w-[12.5rem] snap-start border bg-white/92 p-4 sm:min-w-0;
-  border-color: var(--line);
+  @apply relative min-w-[12.5rem] snap-start overflow-hidden border p-4 text-white sm:min-w-0;
+  min-height: 10.5rem;
+  border-color: rgba(255, 255, 255, 0.24);
   border-radius: 1.25rem;
-  box-shadow: 0 14px 34px rgba(12, 48, 84, 0.065), inset 0 1px 0 white;
+  box-shadow: 0 16px 34px rgba(12, 48, 84, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.finance-metric-card::after {
+  position: absolute;
+  right: -2.25rem;
+  bottom: -3rem;
+  width: 7.5rem;
+  height: 7.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  content: "";
+  box-shadow: 0 0 0 1.4rem rgba(255, 255, 255, 0.04);
+}
+
+.finance-metric-card > * { position: relative; z-index: 1; }
+.finance-metric-card p:first-of-type, .finance-metric-card p:last-child { color: rgba(255, 255, 255, 0.72); }
+.finance-metric-icon { @apply grid h-9 w-9 place-items-center rounded-xl; background: rgba(255, 255, 255, 0.16); }
+.finance-metric-card-receivable { background: linear-gradient(145deg, #c18416, #7a4b08); }
+.finance-metric-card-fleet { background: linear-gradient(145deg, #2563a9, #0b315f); }
+.finance-metric-card-purchases { background: linear-gradient(145deg, #475569, #172033); }
+.finance-metric-card-sales { background: linear-gradient(145deg, #079669, #04533d); }
+.finance-metric-card-contributions { background: linear-gradient(145deg, #0891b2, #155e75); }
+.finance-metric-card-expenses { background: linear-gradient(145deg, #e15353, #8f1d2c); }
+.finance-metric-card-withdrawals { background: linear-gradient(145deg, #e87622, #98400e); }
+
+.finance-drawer {
+  @apply overflow-hidden border bg-white/92;
+  border-color: var(--line);
+  border-radius: 1.5rem;
+  box-shadow: 0 16px 44px rgba(12, 48, 84, 0.07), inset 0 1px 0 white;
+}
+
+.finance-drawer-summary {
+  @apply grid cursor-pointer list-none items-center gap-4 px-5 py-5 outline-none transition sm:px-6;
+  grid-template-columns: minmax(14rem, 1fr) minmax(0, 1.4fr) auto;
+}
+
+.finance-drawer-summary::-webkit-details-marker { display: none; }
+.finance-drawer-summary:hover { background: rgba(238, 244, 251, 0.72); }
+.finance-drawer-summary:focus-visible { box-shadow: inset 0 0 0 2px rgba(197, 148, 53, 0.7); }
+.finance-drawer[open] > .finance-drawer-summary { background: rgba(244, 247, 251, 0.9); }
+.finance-drawer-title { @apply flex min-w-0 items-center gap-3; }
+.finance-drawer-title > span:last-child { @apply min-w-0; }
+.finance-drawer-title small { @apply block text-[9px] font-extrabold uppercase tracking-[0.18em] text-slate-400; }
+.finance-drawer-title strong { @apply mt-1 block truncate font-display text-xl text-slate-950 sm:text-2xl; }
+.finance-drawer-icon { @apply grid h-11 w-11 shrink-0 place-items-center rounded-2xl; }
+.finance-drawer-icon-gold { @apply bg-amber-50 text-amber-700; }
+.finance-drawer-icon-blue { @apply bg-blue-50 text-blue-700; }
+.finance-drawer-icon-emerald { @apply bg-emerald-50 text-emerald-700; }
+.finance-drawer-icon-violet { @apply bg-violet-50 text-violet-700; }
+.finance-drawer-preview { @apply flex min-w-0 flex-wrap items-center justify-end gap-x-6 gap-y-2; }
+.finance-drawer-preview > span { @apply text-[9px] font-extrabold uppercase tracking-wider text-slate-400; }
+.finance-drawer-preview strong { @apply ml-1 text-xs text-slate-800; }
+.finance-drawer-chevron { @apply h-5 w-5 shrink-0 text-slate-400 transition duration-300; }
+.finance-drawer[open] > .finance-drawer-summary .finance-drawer-chevron { transform: rotate(180deg); }
+.finance-drawer-content { @apply border-t border-slate-200/80 p-5 sm:p-6; animation: finance-drawer-in 180ms ease-out; }
+
+@keyframes finance-drawer-in {
+  from { opacity: 0; transform: translateY(-0.35rem); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .finance-profit-strip {
@@ -375,12 +436,22 @@ button:disabled { cursor: not-allowed; }
 .finance-breakdown-out h3, .finance-breakdown-out p strong { @apply text-red-800; }
 
 .finance-chart {
-  @apply min-h-64 rounded-2xl border border-blue-100 bg-white p-5;
-  background-image: linear-gradient(to top, rgba(53, 104, 157, 0.06) 1px, transparent 1px);
+  @apply min-h-64 rounded-2xl border border-blue-100 p-5;
+  background-color: #f8fbff;
+  background-image: linear-gradient(to top, rgba(53, 104, 157, 0.1) 1px, transparent 1px);
   background-size: 100% 25%;
 }
 
-.finance-chart-grid { @apply grid h-52 grid-cols-4 items-end gap-3 pt-5; }
+.finance-chart-grid { @apply grid h-52 grid-cols-4 gap-3; }
+.finance-chart-column { @apply grid min-w-0 grid-rows-[auto_1fr_auto] items-end gap-2 text-center; }
+.finance-chart-value { @apply block truncate text-[9px] font-extrabold text-slate-700; }
+.finance-chart-track { @apply flex h-full min-h-32 items-end justify-center overflow-hidden rounded-xl bg-slate-100/80 px-2 pt-3; }
+.finance-chart-bar { @apply w-full max-w-14 rounded-t-xl shadow-sm; min-height: 0.75rem; transition: height 420ms ease; }
+.finance-chart-bar-in { background: linear-gradient(to top, #047857, #34d399); }
+.finance-chart-bar-forecast { background: linear-gradient(to top, #1d4ed8, #60a5fa); }
+.finance-chart-bar-out { background: linear-gradient(to top, #b91c1c, #fb7185); }
+.finance-chart-bar-result { background: linear-gradient(to top, #a16207, #f4c95d); }
+.finance-chart-label { @apply text-[9px] font-bold uppercase tracking-wide text-slate-500; }
 
 .finance-result-card {
   @apply grid grid-cols-[auto_1fr] items-center gap-x-2 rounded-2xl border border-slate-200 bg-white p-4;
@@ -393,6 +464,12 @@ button:disabled { cursor: not-allowed; }
   .finance-month-row > svg { position: absolute; right: 1.25rem; }
   .finance-month-row { position: relative; padding-right: 3rem; }
   .finance-month-status { margin-top: 0.25rem; }
+}
+
+@media (max-width: 767px) {
+  .finance-drawer-summary { grid-template-columns: minmax(0, 1fr) auto; }
+  .finance-drawer-preview { @apply col-span-2 justify-start border-t border-slate-100 pt-3; }
+  .finance-drawer-title strong { white-space: normal; }
 }
 
 .btn-secondary:hover { border-color: rgba(157, 113, 41, 0.45); background: #fbfdff; }

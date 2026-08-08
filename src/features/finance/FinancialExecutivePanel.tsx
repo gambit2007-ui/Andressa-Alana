@@ -43,21 +43,23 @@ const shortMonth = (month: string) => new Intl.DateTimeFormat('pt-BR', { month: 
 
 function CashFlowChart({ month }: { month: ProfessionalMonthMetrics }) {
   const values = [
-    { label: 'Entradas', value: month.cashEntries, color: 'bg-emerald-500' },
-    { label: 'Previsao', value: month.forecastReceivables, color: 'bg-blue-500' },
-    { label: 'Saidas', value: month.cashOutflows, color: 'bg-red-500' },
-    { label: 'Resultado', value: month.operationalResult, color: 'bg-gold-400' },
+    { label: 'Entradas', value: month.cashEntries, color: 'finance-chart-bar-in' },
+    { label: 'Previsao', value: month.forecastReceivables, color: 'finance-chart-bar-forecast' },
+    { label: 'Saidas', value: month.cashOutflows, color: 'finance-chart-bar-out' },
+    { label: 'Resultado', value: month.operationalResult, color: 'finance-chart-bar-result' },
   ];
   const maximum = Math.max(...values.map((item) => Math.abs(item.value)), 1);
 
   return (
-    <div className="finance-chart">
+    <div className="finance-chart" aria-label="Comparativo financeiro do mes">
       <div className="finance-chart-grid">
         {values.map((item) => (
-          <div key={item.label} className="flex min-w-0 flex-col items-center justify-end gap-2">
-            <span className="max-w-full truncate text-[9px] font-extrabold text-slate-600">{formatCurrency(item.value)}</span>
-            <div className={`w-full max-w-14 rounded-t-xl ${item.color}`} style={{ height: `${Math.max(8, (Math.abs(item.value) / maximum) * 100)}%` }} />
-            <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{item.label}</span>
+          <div key={item.label} className="finance-chart-column">
+            <span className="finance-chart-value">{formatCurrency(item.value)}</span>
+            <div className="finance-chart-track">
+              <div className={`finance-chart-bar ${item.color}`} style={{ height: `${Math.max(10, (Math.abs(item.value) / maximum) * 100)}%` }} />
+            </div>
+            <span className="finance-chart-label">{item.label}</span>
           </div>
         ))}
       </div>
@@ -119,37 +121,60 @@ export function FinancialExecutivePanel({
 
       <div className="finance-metrics-scroll">
         {[
-          { label: 'Contas a receber', value: summary.accountsReceivable, icon: WalletCards, tone: 'text-gold-600', detail: `${formatCurrency(summary.overdueReceivables)} em atraso` },
-          { label: 'Capital em locacao', value: summary.capitalInRentedFleet, icon: Smartphone, tone: 'text-blue-700', detail: 'Custo da frota alugada' },
-          { label: 'Compras no ano', value: summary.annualInventoryPurchases, icon: PackageCheck, tone: 'text-slate-700', detail: 'Investimento em estoque' },
-          { label: 'Vendas diretas', value: summary.annualSalesRevenue, icon: CircleDollarSign, tone: 'text-emerald-700', detail: `Margem ${formatCurrency(summary.annualSalesMargin)}` },
-          { label: 'Aportes', value: summary.annualContributions, icon: ArrowDownToLine, tone: 'text-cyan-700', detail: 'Fora do faturamento' },
-          { label: 'Despesas operacionais', value: summary.annualOperatingExpenses, icon: ReceiptText, tone: 'text-red-700', detail: 'Fretes, taxas e operacao' },
-          { label: 'Retiradas', value: summary.annualWithdrawals, icon: ArrowUpFromLine, tone: 'text-orange-700', detail: 'Fora do resultado operacional' },
+          { label: 'Contas a receber', value: summary.accountsReceivable, icon: WalletCards, accent: 'finance-metric-card-receivable', detail: `${formatCurrency(summary.overdueReceivables)} em atraso` },
+          { label: 'Capital em locacao', value: summary.capitalInRentedFleet, icon: Smartphone, accent: 'finance-metric-card-fleet', detail: 'Custo da frota alugada' },
+          { label: 'Compras no ano', value: summary.annualInventoryPurchases, icon: PackageCheck, accent: 'finance-metric-card-purchases', detail: 'Investimento em estoque' },
+          { label: 'Vendas diretas', value: summary.annualSalesRevenue, icon: CircleDollarSign, accent: 'finance-metric-card-sales', detail: `Margem ${formatCurrency(summary.annualSalesMargin)}` },
+          { label: 'Aportes', value: summary.annualContributions, icon: ArrowDownToLine, accent: 'finance-metric-card-contributions', detail: 'Fora do faturamento' },
+          { label: 'Despesas operacionais', value: summary.annualOperatingExpenses, icon: ReceiptText, accent: 'finance-metric-card-expenses', detail: 'Fretes, taxas e operacao' },
+          { label: 'Retiradas', value: summary.annualWithdrawals, icon: ArrowUpFromLine, accent: 'finance-metric-card-withdrawals', detail: 'Fora do resultado operacional' },
         ].map((metric) => (
-          <article key={metric.label} className="finance-metric-card">
-            <metric.icon className={`h-4 w-4 ${metric.tone}`} />
-            <p className="mt-5 text-[9px] font-extrabold uppercase tracking-[0.14em] text-slate-400">{metric.label}</p>
-            <p className="mt-2 text-lg font-extrabold text-slate-950">{formatCurrency(metric.value)}</p>
-            <p className="mt-1 text-[10px] text-slate-400">{metric.detail}</p>
+          <article key={metric.label} className={`finance-metric-card ${metric.accent}`}>
+            <div className="finance-metric-icon"><metric.icon className="h-4 w-4" /></div>
+            <p className="mt-5 text-[9px] font-extrabold uppercase tracking-[0.14em]">{metric.label}</p>
+            <p className="mt-2 text-lg font-extrabold">{formatCurrency(metric.value)}</p>
+            <p className="mt-1 text-[10px]">{metric.detail}</p>
           </article>
         ))}
       </div>
 
-      <section className="finance-profit-strip">
-        <div><p className="finance-kicker text-gold-500">Resumo de rentabilidade</p><p className="mt-1 text-xs text-slate-500">Indicadores operacionais sem misturar aportes ou compras de estoque</p></div>
-        <div className="finance-profit-stat"><span>Media mensal</span><strong>{formatCurrency(summary.averageMonthlyOperatingResult)}</strong></div>
-        <div className="finance-profit-stat border-emerald-200"><span>Melhor resultado</span><strong className="text-emerald-700">{formatCurrency(summary.recordOperatingResult)}</strong><small>{summary.recordMonth ? formatMonthLabel(summary.recordMonth) : '-'}</small></div>
-        <div className="finance-profit-stat border-blue-200"><span>ROI anual</span><strong className={summary.annualRoi >= 0 ? 'text-blue-700' : 'text-red-700'}>{formatPercentage(summary.annualRoi)}</strong></div>
-      </section>
-
-      <section className="panel overflow-hidden p-0">
-        <div className="flex flex-col gap-3 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div><p className="finance-kicker text-gold-600">Historico detalhado</p><h2 className="mt-1 font-display text-2xl text-slate-950">Desempenho mensal</h2></div>
-          <BarChart3 className="h-5 w-5 text-gold-500" />
+      <details className="finance-drawer">
+        <summary className="finance-drawer-summary">
+          <div className="finance-drawer-title">
+            <span className="finance-drawer-icon finance-drawer-icon-gold"><TrendingUp className="h-5 w-5" /></span>
+            <span><small>Indicadores executivos</small><strong>Rentabilidade</strong></span>
+          </div>
+          <div className="finance-drawer-preview">
+            <span>Media mensal <strong>{formatCurrency(summary.averageMonthlyOperatingResult)}</strong></span>
+            <span>ROI anual <strong>{formatPercentage(summary.annualRoi)}</strong></span>
+          </div>
+          <ChevronDown className="finance-drawer-chevron" />
+        </summary>
+        <div className="finance-drawer-content">
+          <section className="finance-profit-strip">
+            <div><p className="finance-kicker text-gold-500">Resumo de rentabilidade</p><p className="mt-1 text-xs text-slate-500">Indicadores operacionais sem misturar aportes ou compras de estoque</p></div>
+            <div className="finance-profit-stat"><span>Media mensal</span><strong>{formatCurrency(summary.averageMonthlyOperatingResult)}</strong></div>
+            <div className="finance-profit-stat border-emerald-200"><span>Melhor resultado</span><strong className="text-emerald-700">{formatCurrency(summary.recordOperatingResult)}</strong><small>{summary.recordMonth ? formatMonthLabel(summary.recordMonth) : '-'}</small></div>
+            <div className="finance-profit-stat border-blue-200"><span>ROI anual</span><strong className={summary.annualRoi >= 0 ? 'text-blue-700' : 'text-red-700'}>{formatPercentage(summary.annualRoi)}</strong></div>
+          </section>
         </div>
+      </details>
 
-        <div className="divide-y divide-slate-100">
+      <details className="finance-drawer">
+        <summary className="finance-drawer-summary">
+          <div className="finance-drawer-title">
+            <span className="finance-drawer-icon finance-drawer-icon-blue"><BarChart3 className="h-5 w-5" /></span>
+            <span><small>Historico detalhado</small><strong>Fechamento mensal</strong></span>
+          </div>
+          {selected && <div className="finance-drawer-preview">
+            <span>Entradas <strong className="text-emerald-700">{formatCurrency(selected.cashEntries)}</strong></span>
+            <span>Saidas <strong className="text-red-700">{formatCurrency(selected.cashOutflows)}</strong></span>
+            <span>Saldo <strong>{formatCurrency(selected.closingBalance)}</strong></span>
+          </div>}
+          <ChevronDown className="finance-drawer-chevron" />
+        </summary>
+
+        <div className="finance-drawer-content divide-y divide-slate-100 p-0">
           {visibleMonths.map((month) => {
             const isSelected = selected?.month === month.month;
             return (
@@ -207,7 +232,7 @@ export function FinancialExecutivePanel({
             );
           })}
         </div>
-      </section>
+      </details>
     </div>
   );
 }

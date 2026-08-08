@@ -464,61 +464,82 @@ export default function FinancePage() {
         onMonthlyReport={downloadMonthlyReport}
         onCsvExport={downloadCsv}
       />
-      <section className="panel overflow-hidden p-0">
-        <div className="flex flex-col gap-4 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-700">{selectedClosing ? formatMonthLabel(selectedClosing.month) : 'Movimentacoes'}</p>
-            <h2 className="mt-1 font-display text-2xl text-slate-950">Livro Caixa</h2>
+      <details className="finance-drawer">
+        <summary className="finance-drawer-summary">
+          <div className="finance-drawer-title">
+            <span className="finance-drawer-icon finance-drawer-icon-emerald"><ReceiptText className="h-5 w-5" /></span>
+            <span><small>{selectedClosing ? formatMonthLabel(selectedClosing.month) : 'Movimentacoes'}</small><strong>Livro Caixa</strong></span>
           </div>
-          <select className="input sm:w-48" value={cashFilter} onChange={(event) => setCashFilter(event.target.value as 'all' | 'in' | 'out')}>
-            <option value="all">Todas as movimentacoes</option>
-            <option value="in">Somente entradas</option>
-            <option value="out">Somente saidas</option>
-          </select>
-        </div>
-
-        <div className="grid gap-px bg-slate-200/80 sm:grid-cols-3">
-          {[
-            { label: 'Entradas do mes', value: selectedClosing?.cashEntries ?? 0, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50' },
-            { label: 'Saidas do mes', value: selectedClosing?.cashOutflows ?? 0, icon: ArrowUpFromLine, tone: 'text-red-700 bg-red-50' },
-            { label: 'Saldo final', value: selectedClosing?.closingBalance ?? 0, icon: Scale, tone: (selectedClosing?.closingBalance ?? 0) >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50' },
-          ].map((item) => (
-            <article key={item.label} className="flex items-center gap-3 bg-white p-5">
-              <div className={`grid h-10 w-10 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></div>
-              <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p><p className="mt-1 text-lg font-extrabold text-slate-950">{formatCurrency(item.value)}</p></div>
-            </article>
-          ))}
-        </div>
-
-        {cashRows.length === 0 ? (
-          <div className="grid min-h-36 place-items-center p-6 text-sm font-semibold text-slate-500">Nenhuma movimentacao registrada.</div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {cashRows.map((item) => {
-              const isEntry = item.direction === 'in';
-              const Icon = isEntry ? ArrowDownToLine : ArrowUpFromLine;
-              return (
-                <article key={item.id} className="flex items-center gap-3 px-5 py-4 sm:px-6">
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isEntry ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}><Icon className="h-5 w-5" /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold text-slate-900">{item.description}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{categoryLabel[item.kind] ?? item.kind} - {formatDate(item.occurred_on)}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className={`font-extrabold ${isEntry ? 'text-emerald-700' : 'text-red-700'}`}>{isEntry ? '+' : '-'} {formatCurrency(item.amount)}</p>
-                  </div>
-                </article>
-              );
-            })}
+          <div className="finance-drawer-preview">
+            <span>Entradas <strong className="text-emerald-700">{formatCurrency(selectedClosing?.cashEntries ?? 0)}</strong></span>
+            <span>Saidas <strong className="text-red-700">{formatCurrency(selectedClosing?.cashOutflows ?? 0)}</strong></span>
+            <span>Saldo <strong>{formatCurrency(selectedClosing?.closingBalance ?? 0)}</strong></span>
           </div>
-        )}
-      </section>
+          <ChevronDown className="finance-drawer-chevron" />
+        </summary>
 
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-700">Contas por pessoa</p><h2 className="mt-1 font-display text-2xl text-slate-950">Clientes e recebimentos</h2></div>
-          <p className="text-sm font-semibold text-slate-500">{filteredClients.length} cliente{filteredClients.length === 1 ? '' : 's'}</p>
+        <div className="finance-drawer-content p-0">
+          <div className="flex justify-end border-b border-slate-200/80 p-4 sm:px-6">
+            <select className="input sm:w-56" value={cashFilter} onChange={(event) => setCashFilter(event.target.value as 'all' | 'in' | 'out')}>
+              <option value="all">Todas as movimentacoes</option>
+              <option value="in">Somente entradas</option>
+              <option value="out">Somente saidas</option>
+            </select>
+          </div>
+
+          <div className="grid gap-px bg-slate-200/80 sm:grid-cols-3">
+            {[
+              { label: 'Entradas do mes', value: selectedClosing?.cashEntries ?? 0, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50' },
+              { label: 'Saidas do mes', value: selectedClosing?.cashOutflows ?? 0, icon: ArrowUpFromLine, tone: 'text-red-700 bg-red-50' },
+              { label: 'Saldo final', value: selectedClosing?.closingBalance ?? 0, icon: Scale, tone: (selectedClosing?.closingBalance ?? 0) >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50' },
+            ].map((item) => (
+              <article key={item.label} className="flex items-center gap-3 bg-white p-5">
+                <div className={`grid h-10 w-10 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></div>
+                <div><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{item.label}</p><p className="mt-1 text-lg font-extrabold text-slate-950">{formatCurrency(item.value)}</p></div>
+              </article>
+            ))}
+          </div>
+
+          {cashRows.length === 0 ? (
+            <div className="grid min-h-36 place-items-center p-6 text-sm font-semibold text-slate-500">Nenhuma movimentacao registrada.</div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {cashRows.map((item) => {
+                const isEntry = item.direction === 'in';
+                const Icon = isEntry ? ArrowDownToLine : ArrowUpFromLine;
+                return (
+                  <article key={item.id} className="flex items-center gap-3 px-5 py-4 sm:px-6">
+                    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isEntry ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}><Icon className="h-5 w-5" /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-bold text-slate-900">{item.description}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{categoryLabel[item.kind] ?? item.kind} - {formatDate(item.occurred_on)}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className={`font-extrabold ${isEntry ? 'text-emerald-700' : 'text-red-700'}`}>{isEntry ? '+' : '-'} {formatCurrency(item.amount)}</p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
+      </details>
+
+      <details className="finance-drawer">
+        <summary className="finance-drawer-summary">
+          <div className="finance-drawer-title">
+            <span className="finance-drawer-icon finance-drawer-icon-violet"><UserRound className="h-5 w-5" /></span>
+            <span><small>Contas por pessoa</small><strong>Clientes e recebimentos</strong></span>
+          </div>
+          <div className="finance-drawer-preview">
+            <span>Clientes <strong>{filteredClients.length}</strong></span>
+            <span>Recebido <strong className="text-emerald-700">{formatCurrency(stats.received)}</strong></span>
+            <span>Em atraso <strong className="text-red-700">{formatCurrency(stats.overdue)}</strong></span>
+          </div>
+          <ChevronDown className="finance-drawer-chevron" />
+        </summary>
+
+        <div className="finance-drawer-content space-y-4">
 
         <div className="grid gap-4 sm:grid-cols-3">
           {[
@@ -607,7 +628,8 @@ export default function FinancePage() {
             })}
           </div>
         )}
-      </section>
+        </div>
+      </details>
 
       {monthAction && (
         <Modal
