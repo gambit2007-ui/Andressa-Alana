@@ -33,6 +33,7 @@ import {
   recordClientPayment,
   reversePayment,
 } from '../../repositories/rentalRepository';
+import { selectCashBookRows } from '../../domain/cashBook';
 import { buildMonthlyCashClosings } from '../../domain/monthlyClosing';
 import { cashTransactionSchema, type CashTransactionFormData } from '../../schemas/forms';
 import type { Installment, InstallmentStatus, Payment } from '../../types';
@@ -312,10 +313,11 @@ export default function FinancePage() {
     inventoryInvestment: (devicesQuery.data ?? []).reduce((sum, device) => sum + device.purchase_amount, 0),
     operatingExpenses: monthlyClosings.reduce((sum, closing) => sum + closing.extraExpenses, 0),
   }), [currentClosing?.closingBalance, devicesQuery.data, monthlyClosings]);
-  const cashRows = useMemo(() => (cashQuery.data ?? []).filter((item) => (
-    item.occurred_on.slice(0, 7) === selectedClosing?.month
-    && (cashFilter === 'all' || item.direction === cashFilter)
-  )), [cashFilter, cashQuery.data, selectedClosing?.month]);
+  const cashRows = useMemo(() => selectCashBookRows(
+    cashQuery.data ?? [],
+    selectedClosing?.month,
+    cashFilter,
+  ), [cashFilter, cashQuery.data, selectedClosing?.month]);
 
   if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading || devicesQuery.isLoading) return <LoadingState />;
   const canManageFinance = ['admin', 'manager', 'finance'].includes(profile.role);
@@ -489,7 +491,6 @@ export default function FinancePage() {
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={`font-extrabold ${isEntry ? 'text-emerald-700' : 'text-red-700'}`}>{isEntry ? '+' : '-'} {formatCurrency(item.amount)}</p>
-                    {item.status === 'reversed' && <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Estornada</span>}
                   </div>
                 </article>
               );
