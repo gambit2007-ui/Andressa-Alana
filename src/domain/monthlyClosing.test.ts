@@ -108,4 +108,17 @@ describe('fechamento mensal de caixa', () => {
       closingBalance: 10785,
     });
   });
+
+  it('nao duplica o mesmo frete registrado como fornecedor e despesa operacional', () => {
+    const [closing] = buildMonthlyCashClosings([
+      transaction('2026-08-08', 'out', 'supplier', 1200, 'confirmed', 'Frete Wendel'),
+      transaction('2026-08-08', 'out', 'operating_expense', 1200, 'confirmed', 'Frete Wendel'),
+    ], [{ purchase_date: '2026-08-01', purchase_amount: 19580 }], '2026-08');
+
+    expect(closing).toMatchObject({
+      recordedPurchaseOutflows: 0,
+      extraExpenses: 1200,
+      totalOutflows: 20780,
+    });
+  });
 });

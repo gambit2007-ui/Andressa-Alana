@@ -1,5 +1,6 @@
 import { addMonths, format, parseISO } from 'date-fns';
 import type { CashTransaction, Device } from '../types';
+import { canonicalizeCashTransactions } from './cashTransactions';
 
 type ClosingTransaction = Pick<CashTransaction, 'amount' | 'direction' | 'kind' | 'occurred_on' | 'status'>
   & Partial<Pick<CashTransaction, 'description'>>;
@@ -54,7 +55,9 @@ export function buildMonthlyCashClosings(
   devices: ClosingDevice[],
   currentMonth = format(new Date(), 'yyyy-MM'),
 ): MonthlyCashClosing[] {
-  const confirmed = transactions.filter((transaction) => transaction.status === 'confirmed');
+  const confirmed = canonicalizeCashTransactions(
+    transactions.filter((transaction) => transaction.status === 'confirmed'),
+  );
   const representedMonths = [
     currentMonth,
     ...confirmed.map((transaction) => monthKey(transaction.occurred_on)),

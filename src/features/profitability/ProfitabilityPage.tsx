@@ -1,8 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInMonths, parseISO } from 'date-fns';
-import { Award, BatteryWarning, Search, Smartphone } from 'lucide-react';
+import {
+  Award,
+  BatteryWarning,
+  ChevronDown,
+  CircleDollarSign,
+  Landmark,
+  ReceiptText,
+  Scale,
+  Search,
+  Smartphone,
+  TrendingUp,
+} from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '../../components/ui';
+import { canonicalizeCashTransactions } from '../../domain/cashTransactions';
 import {
   calculateAssetMetrics,
   calculateFleetMetrics,
@@ -28,10 +40,15 @@ export default function ProfitabilityPage() {
     },
   });
 
+  const canonicalTransactions = useMemo(
+    () => canonicalizeCashTransactions(query.data?.transactions ?? []),
+    [query.data?.transactions],
+  );
+
   const rows = useMemo(() => {
     if (!query.data) return [];
     const now = new Date();
-    const operationalTransactions = query.data.transactions.filter(isOperationalExpense);
+    const operationalTransactions = canonicalTransactions.filter(isOperationalExpense);
 
     return query.data.devices.map((device) => {
       const deviceInstallments = query.data.installments.filter((installment) => (
@@ -105,7 +122,7 @@ export default function ProfitabilityPage() {
         recommendationTone,
       };
     });
-  }, [query.data, depreciationRate]);
+  }, [canonicalTransactions, query.data, depreciationRate]);
 
   const filteredRows = useMemo(() => rows.filter((row) => (
     `${row.device.model} ${row.device.serial_number} ${row.device.color}`
@@ -130,14 +147,14 @@ export default function ProfitabilityPage() {
     return calculateFleetMetrics({
       capitalInvested: query.data.devices.reduce((sum, device) => sum + device.purchase_amount, 0),
       revenuesReceived: validInstallments.reduce((sum, installment) => sum + installment.paid_amount, 0) + directSalesRevenue,
-      operationalExpenses: query.data.transactions
+      operationalExpenses: canonicalTransactions
         .filter(isOperationalExpense)
         .reduce((sum, transaction) => sum + transaction.amount, 0),
       currentFleetValue: query.data.devices
         .filter((device) => device.status !== 'sold')
         .reduce((sum, device) => sum + device.market_value, 0),
     });
-  }, [query.data]);
+  }, [canonicalTransactions, query.data]);
 
   if (query.isLoading) return <LoadingState />;
 
@@ -164,37 +181,69 @@ export default function ProfitabilityPage() {
       {query.error && <ErrorState error={query.error} />}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <article className="metric-card">
+        <article className="profitability-summary-card profitability-summary-card-capital">
+          <Landmark className="profitability-summary-icon" />
           <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Capital investido</p>
           <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(totals.capitalInvested)}</p>
           <p className="mt-2 text-xs text-slate-500">Ativos patrimoniais, nao despesas</p>
         </article>
-        <article className="metric-card border-emerald-200/80 bg-emerald-50/50">
+        <article className="profitability-summary-card profitability-summary-card-revenue">
+          <CircleDollarSign className="profitability-summary-icon" />
           <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Receitas recebidas</p>
           <p className="mt-2 text-xl font-extrabold text-emerald-700">{formatCurrency(totals.revenuesReceived)}</p>
           <p className="mt-2 text-xs text-emerald-700/70">Locacoes e vendas efetivamente recebidas</p>
         </article>
-        <article className="metric-card border-amber-200/80 bg-amber-50/50">
+        <article className="profitability-summary-card profitability-summary-card-expenses">
+          <ReceiptText className="profitability-summary-icon" />
           <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">Despesas operacionais</p>
           <p className="mt-2 text-xl font-extrabold text-amber-800">{formatCurrency(totals.operationalExpenses)}</p>
           <p className="mt-2 text-xs text-amber-700/70">{unallocatedOperationalExpenses > 0 ? `${formatCurrency(unallocatedOperationalExpenses)} sem aparelho vinculado` : 'Saidas reais vinculadas a operacao'}</p>
         </article>
-        <article className={`metric-card ${operationalProfitPositive ? 'border-emerald-200/80' : 'border-red-200/80'}`}>
+        <article className={`profitability-summary-card ${operationalProfitPositive ? 'profitability-summary-card-profit' : 'profitability-summary-card-negative'}`}>
+          <TrendingUp className="profitability-summary-icon" />
           <p className={`text-[10px] font-extrabold uppercase tracking-wider ${operationalProfitPositive ? 'text-emerald-700' : 'text-red-700'}`}>Lucro operacional</p>
           <p className={`mt-2 text-xl font-extrabold ${operationalProfitPositive ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(totals.operationalProfit)}</p>
           <p className="mt-2 text-xs text-slate-500">ROI operacional {formatPercentage(totals.operationalRoi)}</p>
         </article>
-        <article className="metric-card">
+        <article className="profitability-summary-card profitability-summary-card-fleet">
+          <Smartphone className="profitability-summary-icon" />
           <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Valor atual da frota</p>
           <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(totals.currentFleetValue)}</p>
           <p className={`mt-2 text-xs font-semibold ${variationPositive ? 'text-emerald-700' : 'text-red-700'}`}>Variacao patrimonial {formatCurrency(totals.assetVariation)}</p>
         </article>
-        <article className={`panel-dark p-5 ring-1 ${consolidatedPositive ? 'ring-emerald-400/25' : 'ring-red-400/25'}`}>
+        <article className={`profitability-summary-card profitability-summary-card-consolidated ${consolidatedPositive ? 'ring-emerald-400/25' : 'ring-red-400/25'}`}>
+          <Scale className="profitability-summary-icon" />
           <p className={`text-[10px] font-extrabold uppercase tracking-wider ${consolidatedPositive ? 'text-emerald-300' : 'text-red-300'}`}>Resultado consolidado</p>
           <p className={`mt-2 text-2xl font-extrabold ${consolidatedPositive ? 'text-emerald-200' : 'text-red-200'}`}>{formatCurrency(totals.consolidatedResult)}</p>
           <p className="mt-2 text-xs text-slate-400">ROI consolidado {formatPercentage(totals.consolidatedRoi)}</p>
         </article>
       </div>
+
+      <details className="finance-drawer">
+        <summary className="finance-drawer-summary">
+          <div className="finance-drawer-title">
+            <span className="finance-drawer-icon finance-drawer-icon-blue"><Scale className="h-5 w-5" /></span>
+            <span><small>Guia rapido</small><strong>Como interpretar os indicadores</strong></span>
+          </div>
+          <div className="finance-drawer-preview">
+            <span>Lucro operacional <strong>Receitas - despesas</strong></span>
+            <span>Resultado consolidado <strong>Inclui o valor da frota</strong></span>
+          </div>
+          <ChevronDown className="finance-drawer-chevron" />
+        </summary>
+        <div className="finance-drawer-content grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {[
+            ['Capital investido', 'Soma dos valores pagos na compra dos aparelhos. E patrimonio, nao despesa operacional.'],
+            ['Receitas recebidas', 'Pagamentos de locacao e vendas diretas que ja foram efetivamente recebidos.'],
+            ['Despesas operacionais', 'Fretes, manutencoes, taxas e custos da operacao. Compras de estoque ficam fora.'],
+            ['Lucro operacional', 'Receitas recebidas menos despesas operacionais. Mede o desempenho real da operacao.'],
+            ['Valor atual da frota', 'Soma do valor de mercado dos aparelhos que ainda pertencem a frota.'],
+            ['Resultado consolidado', 'Lucro operacional somado a variacao patrimonial da frota, incluindo vendas ja realizadas.'],
+          ].map(([title, description]) => (
+            <article key={title} className="profitability-guide-card"><strong>{title}</strong><p>{description}</p></article>
+          ))}
+        </div>
+      </details>
 
       <div className="panel p-3">
         <div className="relative">
@@ -229,7 +278,7 @@ export default function ProfitabilityPage() {
                 <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-xs sm:grid-cols-4">
                   <div><p className="text-slate-400">Valor de compra</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.metrics.purchaseValue)}</p></div>
                   <div><p className="text-slate-400">{row.directSale ? 'Valor realizado na venda' : 'Valor de mercado atual'}</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.directSale?.sale_amount ?? row.metrics.currentMarketValue)}</p></div>
-                  <div><p className="text-slate-400">Depreciacao acumulada</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.metrics.accumulatedDepreciation)}</p></div>
+                  <div><p className="text-slate-400">{row.directSale ? 'Custo baixado na venda' : 'Depreciacao acumulada'}</p><p className="mt-1 font-bold text-slate-800">{formatCurrency(row.directSale ? row.metrics.purchaseValue : row.metrics.accumulatedDepreciation)}</p></div>
                   <div><p className="text-slate-400">Tempo restante para recuperar o investimento</p><p className="mt-1 font-bold text-slate-800">{row.directSale ? 'Venda encerrada' : formatMonths(row.metrics.remainingPaybackMonths)}</p></div>
                 </div>
 

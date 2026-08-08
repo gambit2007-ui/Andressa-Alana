@@ -42,6 +42,7 @@ const nonOperationalOutflowKinds = new Set([
   'device_purchase',
   'payment_reversal',
   'security_deposit_refund',
+  'supplier',
   'withdrawal',
 ]);
 

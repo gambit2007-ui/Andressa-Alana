@@ -28,6 +28,25 @@ describe('metricas financeiras da frota', () => {
     });
   });
 
+  it('calcula os totais consolidados sem duplicar o frete de fornecedor', () => {
+    expect(calculateFleetMetrics({
+      capitalInvested: 19580,
+      revenuesReceived: 5030,
+      operationalExpenses: 1200,
+      currentFleetValue: 20571.8,
+    })).toEqual({
+      capitalInvested: 19580,
+      revenuesReceived: 5030,
+      operationalExpenses: 1200,
+      operationalProfit: 3830,
+      currentFleetValue: 20571.8,
+      assetVariation: 991.8,
+      consolidatedResult: 4821.8,
+      operationalRoi: 19.56,
+      consolidatedRoi: 24.63,
+    });
+  });
+
   it('calcula lucro, depreciacao e tempo restante por aparelho', () => {
     expect(calculateAssetMetrics({
       revenueReceived: 1500,
@@ -54,6 +73,7 @@ describe('metricas financeiras da frota', () => {
     expect(isOperationalExpense(transaction('maintenance'))).toBe(true);
     expect(isOperationalExpense(transaction('operating_expense'))).toBe(true);
     expect(isOperationalExpense(transaction('device_purchase'))).toBe(false);
+    expect(isOperationalExpense(transaction('supplier'))).toBe(false);
     expect(isOperationalExpense(transaction('withdrawal'))).toBe(false);
     expect(isOperationalExpense(transaction('payment_reversal'))).toBe(false);
   });

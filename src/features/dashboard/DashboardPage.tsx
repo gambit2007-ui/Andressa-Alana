@@ -22,6 +22,8 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { PageHeader, ErrorState, LoadingState } from '../../components/ui';
+import { canonicalizeCashTransactions } from '../../domain/cashTransactions';
+import { isOperationalExpense } from '../../domain/fleetFinance';
 import { listCashTransactions, listContracts, listDevices, listInstallments, listPayments } from '../../repositories/rentalRepository';
 import { formatCurrency, formatDate, monthKey } from '../../utils/formatters';
 import { buildAgendaDay, buildAgendaMarkers, type AgendaInstallment, type AgendaReceipt } from './agenda';
@@ -153,8 +155,8 @@ export default function DashboardPage() {
     const received = data.payments
       .filter((item) => item.status === 'confirmed' && item.paid_at.startsWith(selectedMonth))
       .reduce((sum, item) => sum + item.amount, 0);
-    const expenses = data.transactions
-      .filter((item) => item.status === 'confirmed' && item.direction === 'out' && item.kind !== 'payment_reversal' && item.occurred_on.startsWith(selectedMonth))
+    const expenses = canonicalizeCashTransactions(data.transactions)
+      .filter((item) => isOperationalExpense(item) && item.occurred_on.startsWith(selectedMonth))
       .reduce((sum, item) => sum + item.amount, 0);
     const expected = monthInstallments.reduce((sum, item) => sum + item.original_amount - item.discount_amount, 0);
     const open = monthInstallments

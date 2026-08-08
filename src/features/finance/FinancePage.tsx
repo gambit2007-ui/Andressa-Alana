@@ -38,6 +38,7 @@ import {
   reversePayment,
 } from '../../repositories/rentalRepository';
 import { selectCashBookRows } from '../../domain/cashBook';
+import { canonicalizeCashTransactions } from '../../domain/cashTransactions';
 import {
   availableFinanceYears,
   buildProfessionalFinance,
@@ -424,7 +425,8 @@ export default function FinancePage() {
 
   const downloadCsv = async () => {
     const { createCashTransactionsCsv, downloadFinancialFile } = await import('../../domain/financialReports');
-    const transactions = (cashQuery.data ?? []).filter((transaction) => transaction.occurred_on.startsWith(`${selectedYear}-`));
+    const transactions = canonicalizeCashTransactions(cashQuery.data ?? [])
+      .filter((transaction) => transaction.occurred_on.startsWith(`${selectedYear}-`));
     downloadFinancialFile(createCashTransactionsCsv(transactions), `vantage-livro-caixa-${selectedYear}.csv`);
   };
 
