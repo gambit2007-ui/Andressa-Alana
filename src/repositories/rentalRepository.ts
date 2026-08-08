@@ -252,12 +252,13 @@ export async function createDirectDeviceSale(
   const { data, error } = await db().rpc('create_direct_device_sale', {
     p_organization_id: organizationId,
     p_device_id: values.device_id,
-    p_client_id: values.client_id,
+    p_client_id: values.client_id || null,
     p_sale_amount: values.sale_amount,
     p_sold_at: new Date(values.sold_at).toISOString(),
     p_payment_method: values.payment_method,
     p_serial_confirmation: values.serial_confirmation.trim().toUpperCase(),
     p_apple_release_confirmed: values.apple_release_confirmed,
+    p_buyer_name: values.buyer_name.trim() || null,
     p_notes: values.notes?.trim() || null,
   });
   throwIfError(error);

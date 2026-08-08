@@ -88,6 +88,7 @@ export type DeviceSale = {
   device_id: string;
   contract_id: string | null;
   client_id: string | null;
+  buyer_name: string;
   sale_amount: number;
   sold_at: string;
   payment_method: PaymentMethod;

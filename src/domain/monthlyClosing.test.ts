@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest';
+import { buildMonthlyCashClosings } from './monthlyClosing';
+
+const transaction = (
+  occurred_on: string,
+  direction: 'in' | 'out',
+  kind: string,
+  amount: number,
+  status: 'confirmed' | 'reversed' = 'confirmed',
+) => ({ occurred_on, direction, kind, amount, status });
+
+describe('fechamento mensal de caixa', () => {
+  it('separa aportes, receitas, compras e despesas extras', () => {
+    const [closing] = buildMonthlyCashClosings([
+      transaction('2026-08-01', 'in', 'capital_contribution', 10000),
+      transaction('2026-08-05', 'in', 'rental_payment', 1200),
+      transaction('2026-08-06', 'in', 'device_sale', 3500),
+      transaction('2026-08-07', 'out', 'supplier', 3200),
+      transaction('2026-08-08', 'out', 'maintenance', 250),
+    ], [{ purchase_date: '2026-08-02', purchase_amount: 3200 }], '2026-08');
+
+    expect(closing).toMatchObject({
+      openingBalance: 0,
+      capitalAdded: 10000,
+      rentalIncome: 1200,
+      salesIncome: 3500,
+      purchaseOutflows: 3200,
+      extraExpenses: 250,
+      inventoryPurchases: 3200,
+      totalEntries: 14700,
+      totalOutflows: 3450,
+      closingBalance: 11250,
+    });
+  });
+
+  it('transporta o saldo final como saldo inicial do mes seguinte', () => {
+    const closings = buildMonthlyCashClosings([
+      transaction('2026-07-10', 'in', 'capital_contribution', 5000),
+      transaction('2026-07-15', 'out', 'operating_expense', 800),
+      transaction('2026-08-03', 'in', 'rental_payment', 600),
+      transaction('2026-08-04', 'out', 'withdrawal', 200),
+    ], [], '2026-08');
+
+    expect(closings[0]).toMatchObject({ month: '2026-07', closingBalance: 4200 });
+    expect(closings[1]).toMatchObject({ month: '2026-08', openingBalance: 4200, netMovement: 400, closingBalance: 4600 });
+  });
+
+  it('ignora movimentacoes estornadas e preserva compras patrimoniais como informacao', () => {
+    const [closing] = buildMonthlyCashClosings([
+      transaction('2026-08-01', 'in', 'other_income', 1000, 'reversed'),
+      transaction('2026-08-02', 'out', 'payment_reversal', 300),
+    ], [{ purchase_date: '2026-08-03', purchase_amount: 2500 }], '2026-08');
+
+    expect(closing).toMatchObject({
+      totalEntries: 0,
+      reversals: 300,
+      inventoryPurchases: 2500,
+      closingBalance: -300,
+    });
+  });
+});

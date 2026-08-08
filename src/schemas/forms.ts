@@ -71,13 +71,18 @@ export const deviceSchema = z.object({
 
 export const directDeviceSaleSchema = z.object({
   device_id: requiredText('Aparelho'),
-  client_id: requiredText('Cliente'),
+  client_id: z.string().trim(),
+  buyer_name: z.string().trim().max(160, 'Use no maximo 160 caracteres.'),
   sale_amount: z.number().positive('O valor da venda deve ser maior que zero.'),
   sold_at: requiredText('Data da venda'),
   payment_method: z.enum(['pix', 'card', 'transfer', 'cash', 'other']),
   serial_confirmation: requiredText('Confirmacao do numero de serie'),
   apple_release_confirmed: z.boolean(),
   notes: z.string().trim().max(1000, 'Use no maximo 1000 caracteres.').optional(),
+}).superRefine((values, context) => {
+  if (!values.client_id && !values.buyer_name) {
+    context.addIssue({ code: 'custom', path: ['buyer_name'], message: 'Informe o nome do comprador avulso.' });
+  }
 });
 
 export const contractSchema = z.object({

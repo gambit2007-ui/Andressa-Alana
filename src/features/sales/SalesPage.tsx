@@ -43,6 +43,7 @@ const localDateTime = () => {
 const saleDefaults = (): DirectDeviceSaleFormData => ({
   device_id: '',
   client_id: '',
+  buyer_name: '',
   sale_amount: 0,
   sold_at: localDateTime(),
   payment_method: 'pix',
@@ -101,7 +102,7 @@ export default function SalesPage() {
     const term = search.trim().toLowerCase();
     if (!term) return query.data?.sales ?? [];
     return (query.data?.sales ?? []).filter((sale) => (
-      `${sale.client?.full_name ?? ''} ${sale.client?.cpf ?? ''} ${sale.device?.model ?? ''} ${sale.device?.serial_number ?? ''}`
+      `${sale.client?.full_name ?? ''} ${sale.buyer_name} ${sale.client?.cpf ?? ''} ${sale.device?.model ?? ''} ${sale.device?.serial_number ?? ''}`
         .toLowerCase()
         .includes(term)
     ));
@@ -159,7 +160,7 @@ export default function SalesPage() {
         eyebrow="Estoque, cliente e caixa"
         title="Vendas de iPhones"
         action={canSell ? (
-          <button className="btn-primary" type="button" onClick={openModal} disabled={!availableDevices.length || !(query.data?.clients.length)}>
+          <button className="btn-primary" type="button" onClick={openModal} disabled={!availableDevices.length}>
             <Plus className="h-4 w-4" />Nova venda direta
           </button>
         ) : undefined}
@@ -190,10 +191,6 @@ export default function SalesPage() {
       {!availableDevices.length && canSell && (
         <div className="alert border-amber-200 bg-amber-50 text-amber-800">Nao ha aparelho disponivel para uma nova venda.</div>
       )}
-      {!query.data?.clients.length && canSell && (
-        <div className="alert border-amber-200 bg-amber-50 text-amber-800">Cadastre o cliente antes de concluir uma venda.</div>
-      )}
-
       <div className="panel p-3">
         <div className="relative"><Search className="input-icon" /><input className="input border-0 bg-slate-50 pl-11" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cliente, CPF, modelo ou numero de serie" /></div>
       </div>
@@ -214,7 +211,7 @@ export default function SalesPage() {
                   <p className="mt-5 text-2xl font-extrabold text-gold-200">{formatCurrency(sale.sale_amount)}</p>
                 </div>
                 <div className="space-y-4 p-5 text-xs">
-                  <div className="flex items-center gap-3"><UserRound className="h-4 w-4 shrink-0 text-cyan-700" /><div className="min-w-0"><p className="truncate font-bold text-slate-800">{sale.client?.full_name ?? 'Cliente nao informado'}</p><p className="mt-0.5 text-[10px] text-slate-400">{sale.client?.cpf ? displayCpf(sale.client.cpf) : '-'}</p></div></div>
+                  <div className="flex items-center gap-3"><UserRound className="h-4 w-4 shrink-0 text-cyan-700" /><div className="min-w-0"><p className="truncate font-bold text-slate-800">{sale.client?.full_name ?? sale.buyer_name}</p><p className="mt-0.5 text-[10px] text-slate-400">{sale.client?.cpf ? displayCpf(sale.client.cpf) : 'Comprador avulso'}</p></div></div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-slate-400">Pagamento</p><p className="mt-1 font-bold text-slate-800">{paymentMethodLabel[sale.payment_method]}</p></div>
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-slate-400">Data da venda</p><p className="mt-1 font-bold text-slate-800">{formatDate(sale.sold_at)}</p></div>
@@ -239,7 +236,11 @@ export default function SalesPage() {
                 form.setValue('serial_confirmation', '');
                 form.setValue('apple_release_confirmed', false);
               } })}><option value="">Selecione</option>{availableDevices.map((device) => <option key={device.id} value={device.id}>{device.model} - {device.color} - SN {device.serial_number}</option>)}</select>{form.formState.errors.device_id && <small className="text-red-600">{form.formState.errors.device_id.message}</small>}</label>
-              <label className="form-field sm:col-span-2"><span>Cliente comprador *</span><select className="input" {...form.register('client_id')}><option value="">Selecione</option>{query.data?.clients.map((client) => <option key={client.id} value={client.id}>{client.full_name} - {displayCpf(client.cpf)}</option>)}</select>{form.formState.errors.client_id && <small className="text-red-600">{form.formState.errors.client_id.message}</small>}</label>
+              <label className="form-field sm:col-span-2"><span>Cliente cadastrado (opcional)</span><select className="input" {...form.register('client_id', { onChange: (event) => {
+                const client = query.data?.clients.find((item) => item.id === event.target.value);
+                form.setValue('buyer_name', client?.full_name ?? '', { shouldValidate: true });
+              } })}><option value="">Venda para comprador avulso</option>{query.data?.clients.map((client) => <option key={client.id} value={client.id}>{client.full_name} - {displayCpf(client.cpf)}</option>)}</select></label>
+              <label className="form-field sm:col-span-2"><span>Nome do comprador *</span><input className="input" maxLength={160} placeholder="Nome do comprador avulso" {...form.register('buyer_name')} />{form.formState.errors.buyer_name && <small className="text-red-600">{form.formState.errors.buyer_name.message}</small>}</label>
               <label className="form-field"><span>Valor recebido *</span><input className="input" type="number" min="0.01" step="0.01" {...form.register('sale_amount', { valueAsNumber: true })} />{form.formState.errors.sale_amount && <small className="text-red-600">{form.formState.errors.sale_amount.message}</small>}</label>
               <label className="form-field"><span>Data e hora *</span><input className="input" type="datetime-local" max={localDateTime()} {...form.register('sold_at')} />{form.formState.errors.sold_at && <small className="text-red-600">{form.formState.errors.sold_at.message}</small>}</label>
               <label className="form-field sm:col-span-2"><span>Forma de pagamento *</span><select className="input" {...form.register('payment_method')}>{Object.entries(paymentMethodLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
