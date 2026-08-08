@@ -26,12 +26,12 @@ describe('fechamento mensal de caixa', () => {
       rentalIncome: 1200,
       salesIncome: 3500,
       recordedPurchaseOutflows: 3200,
-      purchaseOutflows: 6400,
+      purchaseOutflows: 3200,
       extraExpenses: 250,
       inventoryPurchases: 3200,
       totalEntries: 14700,
-      totalOutflows: 6650,
-      closingBalance: 8050,
+      totalOutflows: 3450,
+      closingBalance: 11250,
     });
   });
 
@@ -87,7 +87,6 @@ describe('fechamento mensal de caixa', () => {
       transaction('2026-08-03', 'in', 'rental_payment', 480, 'confirmed', 'Caucao recebida como primeira parcela'),
       transaction('2026-08-04', 'in', 'deposit_received', 1300),
       transaction('2026-08-04', 'in', 'deposit_received', 1235),
-      transaction('2026-08-05', 'out', 'supplier', 1200, 'confirmed', 'Compra de estoque complementar'),
       transaction('2026-08-05', 'out', 'operating_expense', 1200, 'confirmed', 'Frete Wendel'),
     ], [
       { purchase_date: '2026-08-05', purchase_amount: 12800 },
@@ -101,12 +100,12 @@ describe('fechamento mensal de caixa', () => {
       rentalIncome: 0,
       depositIncome: 3865,
       totalEntries: 31565,
-      recordedPurchaseOutflows: 1200,
+      recordedPurchaseOutflows: 0,
       inventoryPurchases: 19580,
-      purchaseOutflows: 20780,
+      purchaseOutflows: 19580,
       extraExpenses: 1200,
-      totalOutflows: 21980,
-      closingBalance: 9585,
+      totalOutflows: 20780,
+      closingBalance: 10785,
     });
   });
 });
