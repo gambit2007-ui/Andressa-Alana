@@ -13,6 +13,7 @@ export type MonthlyCashClosing = {
   capitalAdded: number;
   otherIncome: number;
   totalEntries: number;
+  recordedPurchaseOutflows: number;
   purchaseOutflows: number;
   extraExpenses: number;
   reversals: number;
@@ -70,7 +71,7 @@ export function buildMonthlyCashClosings(
       .filter((transaction) => !['rental_payment', 'device_sale', 'deposit_received', 'capital_contribution'].includes(transaction.kind))
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const totalEntries = rentalIncome + salesIncome + depositIncome + capitalAdded + otherIncome;
-    const purchaseOutflows = outflows
+    const recordedPurchaseOutflows = outflows
       .filter((transaction) => purchaseKinds.has(transaction.kind))
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const reversals = outflows
@@ -84,10 +85,13 @@ export function buildMonthlyCashClosings(
         && transaction.kind !== 'payment_reversal'
         && transaction.kind !== 'withdrawal')
       .reduce((sum, transaction) => sum + transaction.amount, 0);
-    const totalOutflows = purchaseOutflows + extraExpenses + reversals + ownerWithdrawals;
     const inventoryPurchases = devices
       .filter((device) => monthKey(device.purchase_date) === month)
       .reduce((sum, device) => sum + device.purchase_amount, 0);
+    // Device purchases reduce cash even when no matching Livro Caixa entry exists.
+    // Using the greater source total avoids charging the same purchase twice.
+    const purchaseOutflows = Math.max(recordedPurchaseOutflows, inventoryPurchases);
+    const totalOutflows = purchaseOutflows + extraExpenses + reversals + ownerWithdrawals;
     const openingBalance = runningBalance;
     const netMovement = totalEntries - totalOutflows;
     runningBalance = roundMoney(openingBalance + netMovement);
@@ -101,6 +105,7 @@ export function buildMonthlyCashClosings(
       capitalAdded: roundMoney(capitalAdded),
       otherIncome: roundMoney(otherIncome),
       totalEntries: roundMoney(totalEntries),
+      recordedPurchaseOutflows: roundMoney(recordedPurchaseOutflows),
       purchaseOutflows: roundMoney(purchaseOutflows),
       extraExpenses: roundMoney(extraExpenses),
       reversals: roundMoney(reversals),

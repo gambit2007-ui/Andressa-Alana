@@ -24,6 +24,7 @@ describe('fechamento mensal de caixa', () => {
       capitalAdded: 10000,
       rentalIncome: 1200,
       salesIncome: 3500,
+      recordedPurchaseOutflows: 3200,
       purchaseOutflows: 3200,
       extraExpenses: 250,
       inventoryPurchases: 3200,
@@ -45,7 +46,7 @@ describe('fechamento mensal de caixa', () => {
     expect(closings[1]).toMatchObject({ month: '2026-08', openingBalance: 4200, netMovement: 400, closingBalance: 4600 });
   });
 
-  it('ignora movimentacoes estornadas e preserva compras patrimoniais como informacao', () => {
+  it('desconta compras patrimoniais sem lancamento duplicado no caixa', () => {
     const [closing] = buildMonthlyCashClosings([
       transaction('2026-08-01', 'in', 'other_income', 1000, 'reversed'),
       transaction('2026-08-02', 'out', 'payment_reversal', 300),
@@ -54,8 +55,31 @@ describe('fechamento mensal de caixa', () => {
     expect(closing).toMatchObject({
       totalEntries: 0,
       reversals: 300,
+      recordedPurchaseOutflows: 0,
+      purchaseOutflows: 2500,
       inventoryPurchases: 2500,
-      closingBalance: -300,
+      totalOutflows: 2800,
+      closingBalance: -2800,
+    });
+  });
+
+  it('calcula o caixa com aportes e recebimentos menos as compras cadastradas', () => {
+    const [closing] = buildMonthlyCashClosings([
+      transaction('2026-08-01', 'in', 'capital_contribution', 18050),
+      transaction('2026-08-02', 'in', 'rental_payment', 1330),
+      transaction('2026-08-03', 'in', 'deposit_received', 1235.90),
+    ], [
+      { purchase_date: '2026-08-04', purchase_amount: 12800 },
+      { purchase_date: '2026-08-05', purchase_amount: 7980 },
+    ], '2026-08');
+
+    expect(closing).toMatchObject({
+      totalEntries: 20615.90,
+      recordedPurchaseOutflows: 0,
+      inventoryPurchases: 20780,
+      purchaseOutflows: 20780,
+      totalOutflows: 20780,
+      closingBalance: -164.10,
     });
   });
 });
