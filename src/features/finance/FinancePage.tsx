@@ -219,7 +219,6 @@ export default function FinancePage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | InstallmentStatus>('all');
-  const [cashFilter, setCashFilter] = useState<'all' | 'in' | 'out'>('all');
   const [selectedMonth, setSelectedMonth] = useState(today().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(Number(today().slice(0, 4)));
   const [cashModalOpen, setCashModalOpen] = useState(false);
@@ -356,11 +355,16 @@ export default function FinancePage() {
   }), [cashQuery.data, closingsQuery.data, devicesQuery.data, installmentsQuery.data, salesQuery.data, selectedYear]);
   const selectedClosing = financeSummary.months.find((closing) => closing.month === selectedMonth)
     ?? financeSummary.months[financeSummary.months.length - 1];
-  const cashRows = useMemo(() => selectCashBookRows(
+  const cashEntryRows = useMemo(() => selectCashBookRows(
     cashQuery.data ?? [],
     selectedMonth,
-    cashFilter,
-  ), [cashFilter, cashQuery.data, selectedMonth]);
+    'in',
+  ), [cashQuery.data, selectedMonth]);
+  const cashOutflowRows = useMemo(() => selectCashBookRows(
+    cashQuery.data ?? [],
+    selectedMonth,
+    'out',
+  ), [cashQuery.data, selectedMonth]);
 
   if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading || devicesQuery.isLoading || salesQuery.isLoading || closingsQuery.isLoading) return <LoadingState />;
   const canManageFinance = ['admin', 'manager', 'finance'].includes(profile.role);
@@ -481,14 +485,6 @@ export default function FinancePage() {
         </summary>
 
         <div className="finance-drawer-content p-0">
-          <div className="flex justify-end border-b border-slate-200/80 p-4 sm:px-6">
-            <select className="input sm:w-56" value={cashFilter} onChange={(event) => setCashFilter(event.target.value as 'all' | 'in' | 'out')}>
-              <option value="all">Todas as movimentacoes</option>
-              <option value="in">Somente entradas</option>
-              <option value="out">Somente saidas</option>
-            </select>
-          </div>
-
           <div className="grid gap-px bg-slate-200/80 sm:grid-cols-3">
             {[
               { label: 'Entradas do mes', value: selectedClosing?.cashEntries ?? 0, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50' },
@@ -502,28 +498,73 @@ export default function FinancePage() {
             ))}
           </div>
 
-          {cashRows.length === 0 ? (
-            <div className="grid min-h-36 place-items-center p-6 text-sm font-semibold text-slate-500">Nenhuma movimentacao registrada.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {cashRows.map((item) => {
-                const isEntry = item.direction === 'in';
-                const Icon = isEntry ? ArrowDownToLine : ArrowUpFromLine;
-                return (
-                  <article key={item.id} className="flex items-center gap-3 px-5 py-4 sm:px-6">
-                    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isEntry ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}><Icon className="h-5 w-5" /></div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold text-slate-900">{item.description}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{categoryLabel[item.kind] ?? item.kind} - {formatDate(item.occurred_on)}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className={`font-extrabold ${isEntry ? 'text-emerald-700' : 'text-red-700'}`}>{isEntry ? '+' : '-'} {formatCurrency(item.amount)}</p>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+          <div className="grid border-t border-slate-200/80 xl:grid-cols-2">
+            {[
+              {
+                key: 'in',
+                title: 'Entradas',
+                subtitle: 'Valores que aumentaram o caixa',
+                total: selectedClosing?.cashEntries ?? 0,
+                rows: cashEntryRows,
+                Icon: ArrowDownToLine,
+                headerTone: 'border-emerald-200 bg-emerald-50/70 text-emerald-800',
+                iconTone: 'bg-emerald-100 text-emerald-700',
+                valueTone: 'text-emerald-700',
+              },
+              {
+                key: 'out',
+                title: 'Saidas',
+                subtitle: 'Valores que reduziram o caixa',
+                total: selectedClosing?.cashOutflows ?? 0,
+                rows: cashOutflowRows,
+                Icon: ArrowUpFromLine,
+                headerTone: 'border-red-200 bg-red-50/70 text-red-800',
+                iconTone: 'bg-red-100 text-red-700',
+                valueTone: 'text-red-700',
+              },
+            ].map((section) => (
+              <section key={section.key} className="min-w-0 border-b border-slate-200/80 last:border-b-0 xl:border-b-0 xl:border-r xl:last:border-r-0">
+                <header className={`flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${section.headerTone}`}>
+                  <div className="flex items-center gap-3">
+                    <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${section.iconTone}`}><section.Icon className="h-5 w-5" /></span>
+                    <span><strong className="block text-sm font-extrabold">{section.title}</strong><small className="text-xs font-medium opacity-75">{section.subtitle}</small></span>
+                  </div>
+                  <strong className="text-lg font-extrabold">{formatCurrency(section.total)}</strong>
+                </header>
+
+                <div className="grid grid-cols-2 gap-px bg-slate-200/80 text-xs">
+                  {section.key === 'in' ? (
+                    <>
+                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Receitas da operacao</span><strong className="mt-1 block text-emerald-700">{formatCurrency(Math.max(0, (selectedClosing?.cashEntries ?? 0) - (selectedClosing?.capitalAdded ?? 0)))}</strong></div>
+                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Aportes ao caixa</span><strong className="mt-1 block text-slate-900">{formatCurrency(selectedClosing?.capitalAdded ?? 0)}</strong></div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Compras de estoque</span><strong className="mt-1 block text-red-700">{formatCurrency(selectedClosing?.inventoryPurchases ?? 0)}</strong></div>
+                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Demais saidas</span><strong className="mt-1 block text-red-700">{formatCurrency(Math.max(0, (selectedClosing?.cashOutflows ?? 0) - (selectedClosing?.inventoryPurchases ?? 0)))}</strong></div>
+                    </>
+                  )}
+                </div>
+
+                {section.rows.length === 0 ? (
+                  <div className="grid min-h-32 place-items-center p-6 text-center text-sm font-semibold text-slate-500">Nenhum lancamento registrado nesta categoria.</div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {section.rows.map((item) => (
+                      <article key={item.id} className="flex items-center gap-3 px-5 py-4 sm:px-6">
+                        <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${section.iconTone}`}><section.Icon className="h-5 w-5" /></div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold text-slate-900">{item.description}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{categoryLabel[item.kind] ?? item.kind} - {formatDate(item.occurred_on)}</p>
+                        </div>
+                        <p className={`shrink-0 text-right font-extrabold ${section.valueTone}`}>{section.key === 'in' ? '+' : '-'} {formatCurrency(item.amount)}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
         </div>
       </details>
 

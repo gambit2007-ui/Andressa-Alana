@@ -226,6 +226,10 @@ export function FinancialExecutivePanel({
                       <div className="finance-result-card"><Scale className="h-4 w-4 text-blue-700" /><span>ROI da frota no mes</span><strong>{formatPercentage(monthRoi)}</strong></div>
                       <div className="finance-result-card"><CircleDollarSign className="h-4 w-4 text-slate-700" /><span>Margem nas vendas</span><strong>{formatCurrency(month.salesMargin)}</strong></div>
                     </div>
+                    <div className="mt-3 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs leading-5 text-blue-950">
+                      <CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+                      <p><strong>Resultado operacional e o lucro gerado pela operacao no mes:</strong> locacoes, caucoes, margem das vendas e outras receitas, menos despesas operacionais e estornos. Aportes, retiradas e compras de estoque nao alteram este indicador.</p>
+                    </div>
                   </div>
                 )}
               </div>
