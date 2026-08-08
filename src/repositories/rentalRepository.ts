@@ -514,16 +514,26 @@ export async function consolidateCashLedger(
     .from('cash_transactions')
     .select('*')
     .eq('organization_id', organizationId)
-    .eq('kind', 'operating_expense')
     .eq('direction', 'out')
     .eq('amount', 1200)
     .eq('status', 'confirmed');
   throwIfError(freightQueryError);
 
-  const freightExists = ((freightData ?? []) as unknown as CashTransaction[]).some((transaction) => (
-    transaction.description.trim().toLowerCase() === wendelFreightDescription.toLowerCase()
-  ));
-  if (!freightExists) {
+  const freightRows = (freightData ?? []) as unknown as CashTransaction[];
+  const describedFreightRows = freightRows.filter((transaction) => {
+    const description = transaction.description.trim().toLowerCase();
+    return description.includes('frete') || description.includes('wendel');
+  });
+  const supplierRows = freightRows.filter((transaction) => transaction.kind === 'supplier');
+  const freightCandidates = [...new Map([
+    ...describedFreightRows,
+    ...(supplierRows.length === 1 ? supplierRows : []),
+  ].map((transaction) => [transaction.id, transaction])).values()];
+  let canonicalFreight = freightCandidates.find((transaction) => transaction.kind === 'operating_expense')
+    ?? freightCandidates[0];
+  let freightCreated = false;
+
+  if (!canonicalFreight) {
     const { error } = await client.from('cash_transactions').insert({
       organization_id: organizationId,
       kind: 'operating_expense',
@@ -534,12 +544,32 @@ export async function consolidateCashLedger(
       status: 'confirmed',
     });
     throwIfError(error);
+    freightCreated = true;
+  } else if (canonicalFreight.kind !== 'operating_expense'
+    || canonicalFreight.description !== wendelFreightDescription) {
+    const { data, error } = await client.from('cash_transactions')
+      .update({ kind: 'operating_expense', description: wendelFreightDescription })
+      .eq('id', canonicalFreight.id)
+      .select('*')
+      .single();
+    throwIfError(error);
+    canonicalFreight = data as unknown as CashTransaction;
+  }
+
+  const duplicateFreightIds = freightCandidates
+    .filter((transaction) => transaction.id !== canonicalFreight?.id)
+    .map((transaction) => transaction.id);
+  if (duplicateFreightIds.length > 0) {
+    const { error } = await client.from('cash_transactions')
+      .update({ status: 'reversed' })
+      .in('id', duplicateFreightIds);
+    throwIfError(error);
   }
 
   return {
     reversedContributions: contributionIdsToReverse.length,
     contributionCreated,
-    freightCreated: !freightExists,
+    freightCreated,
   };
 }
 
