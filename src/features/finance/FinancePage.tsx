@@ -413,8 +413,8 @@ export default function FinancePage() {
 
           <div className="mx-5 mb-5 grid gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:mx-6 sm:mb-6 sm:grid-cols-3">
             <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Custo dos aparelhos no mes</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.inventoryPurchases)}</p></div>
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Compras registradas no Livro Caixa</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.recordedPurchaseOutflows)}</p></div>
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Complemento automatico no fechamento</p><p className={`mt-1 font-extrabold ${Math.abs(selectedClosing.inventoryPurchases - selectedClosing.recordedPurchaseOutflows) < 0.01 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatCurrency(Math.max(0, selectedClosing.inventoryPurchases - selectedClosing.recordedPurchaseOutflows))}</p></div>
+            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Compras lancadas manualmente</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.recordedPurchaseOutflows)}</p></div>
+            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Base usada no caixa</p><p className="mt-1 font-extrabold text-emerald-700">{formatCurrency(selectedClosing.purchaseOutflows)}</p></div>
           </div>
 
           <div className="border-t border-slate-200/80">

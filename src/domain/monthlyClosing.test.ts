@@ -64,31 +64,46 @@ describe('fechamento mensal de caixa', () => {
     });
   });
 
-  it('reconcilia aportes, venda e caucoes antigas menos as compras de estoque', () => {
+  it('usa lancamentos de compra como fallback quando nao ha estoque cadastrado', () => {
     const [closing] = buildMonthlyCashClosings([
-      transaction('2026-08-01', 'in', 'capital_contribution', 3200),
-      transaction('2026-08-01', 'in', 'capital_contribution', 14850),
+      transaction('2026-08-01', 'in', 'capital_contribution', 5000),
+      transaction('2026-08-02', 'out', 'supplier', 3200),
+    ], [], '2026-08');
+
+    expect(closing).toMatchObject({
+      totalEntries: 5000,
+      recordedPurchaseOutflows: 3200,
+      inventoryPurchases: 0,
+      purchaseOutflows: 3200,
+      closingBalance: 1800,
+    });
+  });
+
+  it('prioriza compras do estoque e reconcilia o saldo disponivel informado', () => {
+    const [closing] = buildMonthlyCashClosings([
+      transaction('2026-08-01', 'in', 'capital_contribution', 19950),
       transaction('2026-08-02', 'in', 'device_sale', 3700),
       transaction('2026-08-03', 'in', 'rental_payment', 850, 'confirmed', 'Caucao recebida como primeira parcela'),
       transaction('2026-08-03', 'in', 'rental_payment', 480, 'confirmed', 'Caução recebida como primeira parcela'),
       transaction('2026-08-04', 'in', 'deposit_received', 1300),
       transaction('2026-08-04', 'in', 'deposit_received', 1235),
+      transaction('2026-08-05', 'out', 'supplier', 20780),
     ], [
       { purchase_date: '2026-08-05', purchase_amount: 12800 },
-      { purchase_date: '2026-08-06', purchase_amount: 7980 },
+      { purchase_date: '2026-08-06', purchase_amount: 7385 },
     ], '2026-08');
 
     expect(closing).toMatchObject({
-      capitalAdded: 18050,
+      capitalAdded: 19950,
       salesIncome: 3700,
       rentalIncome: 0,
       depositIncome: 3865,
-      totalEntries: 25615,
-      recordedPurchaseOutflows: 0,
-      inventoryPurchases: 20780,
-      purchaseOutflows: 20780,
-      totalOutflows: 20780,
-      closingBalance: 4835,
+      totalEntries: 27515,
+      recordedPurchaseOutflows: 20780,
+      inventoryPurchases: 20185,
+      purchaseOutflows: 20185,
+      totalOutflows: 20185,
+      closingBalance: 7330,
     });
   });
 });
