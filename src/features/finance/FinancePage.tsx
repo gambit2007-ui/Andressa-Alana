@@ -24,6 +24,7 @@ import { useForm } from 'react-hook-form';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
 import {
+  consolidateCashLedger,
   createCashTransaction,
   listCashTransactions,
   listDevices,
@@ -205,6 +206,8 @@ export default function FinancePage() {
   const [cashFilter, setCashFilter] = useState<'all' | 'in' | 'out'>('all');
   const [selectedMonth, setSelectedMonth] = useState(today().slice(0, 7));
   const [cashModalOpen, setCashModalOpen] = useState(false);
+  const [consolidationOpen, setConsolidationOpen] = useState(false);
+  const [consolidationNotice, setConsolidationNotice] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientFinanceGroup | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
   const [amount, setAmount] = useState(0);
@@ -264,6 +267,15 @@ export default function FinancePage() {
     },
   });
 
+  const consolidationMutation = useMutation({
+    mutationFn: () => consolidateCashLedger(profile.organization_id, today()),
+    onSuccess: async (result) => {
+      await refreshFinance();
+      setConsolidationOpen(false);
+      setConsolidationNotice(`Caixa consolidado. ${result.reversedContributions} aporte(s) anterior(es) estornado(s); aporte unico e frete conferidos.`);
+    },
+  });
+
   const clientGroups = useMemo(() => buildClientGroups(installmentsQuery.data ?? []), [installmentsQuery.data]);
   const receipts = useMemo(() => buildReceipts(paymentsQuery.data ?? []), [paymentsQuery.data]);
   const receiptsByClient = useMemo(() => {
@@ -298,6 +310,7 @@ export default function FinancePage() {
     directSales: monthlyClosings.reduce((sum, closing) => sum + closing.salesIncome, 0),
     depositsReceived: monthlyClosings.reduce((sum, closing) => sum + closing.depositIncome, 0),
     inventoryInvestment: (devicesQuery.data ?? []).reduce((sum, device) => sum + device.purchase_amount, 0),
+    operatingExpenses: monthlyClosings.reduce((sum, closing) => sum + closing.extraExpenses, 0),
   }), [currentClosing?.closingBalance, devicesQuery.data, monthlyClosings]);
   const cashRows = useMemo(() => (cashQuery.data ?? []).filter((item) => (
     item.occurred_on.slice(0, 7) === selectedClosing?.month
@@ -306,6 +319,7 @@ export default function FinancePage() {
 
   if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading || devicesQuery.isLoading) return <LoadingState />;
   const canManageFinance = ['admin', 'manager', 'finance'].includes(profile.role);
+  const canConsolidateFinance = ['admin', 'manager'].includes(profile.role);
   const categories = cashDirection === 'in' ? entryCategories : withdrawalCategories;
 
   const chooseDirection = (direction: 'in' | 'out') => {
@@ -353,10 +367,10 @@ export default function FinancePage() {
         eyebrow="Caixa, clientes e cobranca"
         title="Financeiro"
         action={canManageFinance && (
-          <button className="btn-primary" type="button" onClick={() => setCashModalOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Nova movimentacao
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {canConsolidateFinance && <button className="btn-secondary" type="button" onClick={() => { consolidationMutation.reset(); setConsolidationOpen(true); }}><Landmark className="h-4 w-4" />Consolidar caixa</button>}
+            <button className="btn-primary" type="button" onClick={() => setCashModalOpen(true)}><Plus className="h-4 w-4" />Nova movimentacao</button>
+          </div>
         )}
       />
 
@@ -364,14 +378,16 @@ export default function FinancePage() {
       {paymentsQuery.error && <ErrorState error={paymentsQuery.error} />}
       {cashQuery.error && <ErrorState error={cashQuery.error} />}
       {devicesQuery.error && <ErrorState error={devicesQuery.error} />}
+      {consolidationNotice && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">{consolidationNotice}</div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {[
           { label: 'Caixa total', value: professionalStats.currentCash, icon: Landmark, tone: professionalStats.currentCash >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50', detail: 'Entradas confirmadas menos todas as saidas' },
           { label: 'Aportes', value: professionalStats.capitalAdded, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50', detail: 'Capital adicionado ao caixa' },
           { label: 'Venda direta', value: professionalStats.directSales, icon: Banknote, tone: 'text-blue-700 bg-blue-50', detail: 'Recebimentos por aparelhos vendidos' },
           { label: 'Caucoes', value: professionalStats.depositsReceived, icon: Scale, tone: 'text-amber-700 bg-amber-50', detail: 'Garantias recebidas nos contratos' },
           { label: 'Compras de estoque', value: professionalStats.inventoryInvestment, icon: Smartphone, tone: 'text-red-700 bg-red-50', detail: 'Valor usado na aquisicao de aparelhos' },
+          { label: 'Despesas operacionais', value: professionalStats.operatingExpenses, icon: ReceiptText, tone: 'text-orange-700 bg-orange-50', detail: 'Fretes, taxas, manutencao e operacao' },
         ].map((item) => (
           <article key={item.label} className="metric-card flex items-center gap-4">
             <div className={`grid h-11 w-11 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></div>
@@ -576,6 +592,21 @@ export default function FinancePage() {
           </div>
         )}
       </section>
+
+      {consolidationOpen && (
+        <Modal title="Consolidar caixa" description="Esta operacao preserva o historico e pode ser executada novamente sem duplicar valores." onClose={() => { if (!consolidationMutation.isPending) setConsolidationOpen(false); }}>
+          <div className="space-y-5">
+            {consolidationMutation.error && <ErrorState error={consolidationMutation.error} />}
+            <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <p><strong>Aportes antigos:</strong> serao estornados, sem exclusao do historico.</p>
+              <p><strong>Novo aporte unico:</strong> R$ 24.000,00 para compras e operacoes.</p>
+              <p><strong>Nova saida:</strong> R$ 1.200,00 referente ao Frete Wendel.</p>
+              <p><strong>Sem alteracao:</strong> compras dos aparelhos, vendas diretas e caucoes continuarao vindo dos registros do app.</p>
+            </div>
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button className="btn-secondary" disabled={consolidationMutation.isPending} type="button" onClick={() => setConsolidationOpen(false)}>Cancelar</button><button className="btn-primary" disabled={consolidationMutation.isPending} type="button" onClick={() => consolidationMutation.mutate()}><Landmark className="h-4 w-4" />{consolidationMutation.isPending ? 'Consolidando...' : 'Confirmar consolidacao'}</button></div>
+          </div>
+        </Modal>
+      )}
 
       {cashModalOpen && (
         <Modal title="Nova movimentacao" onClose={closeCashModal}>

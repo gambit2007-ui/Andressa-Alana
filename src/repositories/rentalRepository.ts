@@ -455,6 +455,94 @@ export async function createCashTransaction(
   return { ...row, amount: toMoney(row.amount) };
 }
 
+export type CashLedgerConsolidationResult = {
+  reversedContributions: number;
+  contributionCreated: boolean;
+  freightCreated: boolean;
+};
+
+const consolidatedContributionDescription = 'Aporte unico para compras e operacoes';
+const wendelFreightDescription = 'Frete Wendel';
+
+export async function consolidateCashLedger(
+  organizationId: string,
+  occurredOn: string,
+): Promise<CashLedgerConsolidationResult> {
+  const client = db();
+  const { data: contributionData, error: contributionError } = await client
+    .from('cash_transactions')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .eq('kind', 'capital_contribution')
+    .eq('direction', 'in');
+  throwIfError(contributionError);
+
+  const contributions = ((contributionData ?? []) as unknown as CashTransaction[])
+    .filter((transaction) => transaction.status === 'confirmed');
+  let canonicalContribution = contributions.find((transaction) => (
+    toMoney(transaction.amount) === 24000
+    && transaction.description.trim().toLowerCase() === consolidatedContributionDescription.toLowerCase()
+  ));
+  let contributionCreated = false;
+
+  if (!canonicalContribution) {
+    const { data, error } = await client.from('cash_transactions').insert({
+      organization_id: organizationId,
+      kind: 'capital_contribution',
+      direction: 'in',
+      amount: 24000,
+      occurred_on: occurredOn,
+      description: consolidatedContributionDescription,
+      status: 'confirmed',
+    }).select('*').single();
+    throwIfError(error);
+    canonicalContribution = data as unknown as CashTransaction;
+    contributionCreated = true;
+  }
+
+  const contributionIdsToReverse = contributions
+    .filter((transaction) => transaction.id !== canonicalContribution?.id)
+    .map((transaction) => transaction.id);
+  if (contributionIdsToReverse.length > 0) {
+    const { error } = await client.from('cash_transactions')
+      .update({ status: 'reversed' })
+      .in('id', contributionIdsToReverse);
+    throwIfError(error);
+  }
+
+  const { data: freightData, error: freightQueryError } = await client
+    .from('cash_transactions')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .eq('kind', 'operating_expense')
+    .eq('direction', 'out')
+    .eq('amount', 1200)
+    .eq('status', 'confirmed');
+  throwIfError(freightQueryError);
+
+  const freightExists = ((freightData ?? []) as unknown as CashTransaction[]).some((transaction) => (
+    transaction.description.trim().toLowerCase() === wendelFreightDescription.toLowerCase()
+  ));
+  if (!freightExists) {
+    const { error } = await client.from('cash_transactions').insert({
+      organization_id: organizationId,
+      kind: 'operating_expense',
+      direction: 'out',
+      amount: 1200,
+      occurred_on: occurredOn,
+      description: wendelFreightDescription,
+      status: 'confirmed',
+    });
+    throwIfError(error);
+  }
+
+  return {
+    reversedContributions: contributionIdsToReverse.length,
+    contributionCreated,
+    freightCreated: !freightExists,
+  };
+}
+
 export async function recordPayment(input: {
   installmentId: string;
   amount: number;
