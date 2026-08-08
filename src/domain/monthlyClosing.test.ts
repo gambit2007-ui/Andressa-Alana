@@ -79,31 +79,34 @@ describe('fechamento mensal de caixa', () => {
     });
   });
 
-  it('prioriza compras do estoque e reconcilia o saldo disponivel informado', () => {
+  it('fecha o caixa com todas as entradas confirmadas e as compras reais do estoque', () => {
     const [closing] = buildMonthlyCashClosings([
-      transaction('2026-08-01', 'in', 'capital_contribution', 19950),
+      transaction('2026-08-01', 'in', 'capital_contribution', 3200),
+      transaction('2026-08-01', 'in', 'capital_contribution', 14850),
+      transaction('2026-08-01', 'in', 'capital_contribution', 1900),
+      transaction('2026-08-01', 'in', 'capital_contribution', 700),
       transaction('2026-08-02', 'in', 'device_sale', 3700),
       transaction('2026-08-03', 'in', 'rental_payment', 850, 'confirmed', 'Caucao recebida como primeira parcela'),
-      transaction('2026-08-03', 'in', 'rental_payment', 480, 'confirmed', 'Caução recebida como primeira parcela'),
+      transaction('2026-08-03', 'in', 'rental_payment', 480, 'confirmed', 'Caucao recebida como primeira parcela'),
       transaction('2026-08-04', 'in', 'deposit_received', 1300),
       transaction('2026-08-04', 'in', 'deposit_received', 1235),
-      transaction('2026-08-05', 'out', 'supplier', 20780),
     ], [
       { purchase_date: '2026-08-05', purchase_amount: 12800 },
-      { purchase_date: '2026-08-06', purchase_amount: 7385 },
+      { purchase_date: '2026-08-06', purchase_amount: 8785 },
     ], '2026-08');
 
     expect(closing).toMatchObject({
-      capitalAdded: 19950,
+      capitalAdded: 20650,
+      otherIncome: 0,
       salesIncome: 3700,
       rentalIncome: 0,
       depositIncome: 3865,
-      totalEntries: 27515,
-      recordedPurchaseOutflows: 20780,
-      inventoryPurchases: 20185,
-      purchaseOutflows: 20185,
-      totalOutflows: 20185,
-      closingBalance: 7330,
+      totalEntries: 28215,
+      recordedPurchaseOutflows: 0,
+      inventoryPurchases: 21585,
+      purchaseOutflows: 21585,
+      totalOutflows: 21585,
+      closingBalance: 6630,
     });
   });
 });

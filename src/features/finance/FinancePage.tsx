@@ -212,10 +212,10 @@ export default function FinancePage() {
   const [paymentDate, setPaymentDate] = useState(today());
   const [paymentNotes, setPaymentNotes] = useState('');
   const [reversalReason, setReversalReason] = useState('');
-  const installmentsQuery = useQuery({ queryKey: ['installments'], queryFn: listInstallments });
-  const paymentsQuery = useQuery({ queryKey: ['payments'], queryFn: listPayments });
-  const cashQuery = useQuery({ queryKey: ['cash-transactions'], queryFn: listCashTransactions });
-  const devicesQuery = useQuery({ queryKey: ['devices'], queryFn: listDevices });
+  const installmentsQuery = useQuery({ queryKey: ['installments'], queryFn: listInstallments, refetchOnMount: 'always' });
+  const paymentsQuery = useQuery({ queryKey: ['payments'], queryFn: listPayments, refetchOnMount: 'always' });
+  const cashQuery = useQuery({ queryKey: ['cash-transactions'], queryFn: listCashTransactions, refetchOnMount: 'always' });
+  const devicesQuery = useQuery({ queryKey: ['devices'], queryFn: listDevices, refetchOnMount: 'always' });
   const cashForm = useForm<CashTransactionFormData>({
     resolver: zodResolver(cashTransactionSchema),
     defaultValues: cashDefaults(),
@@ -412,9 +412,9 @@ export default function FinancePage() {
           </div>
 
           <div className="mx-5 mb-5 grid gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:mx-6 sm:mb-6 sm:grid-cols-3">
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Custo dos aparelhos no mes</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.inventoryPurchases)}</p></div>
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Compras lancadas manualmente</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.recordedPurchaseOutflows)}</p></div>
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Base usada no caixa</p><p className="mt-1 font-extrabold text-emerald-700">{formatCurrency(selectedClosing.purchaseOutflows)}</p></div>
+            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Compras de estoque no mes</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.inventoryPurchases)}</p></div>
+            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Lancamentos manuais de compra</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.recordedPurchaseOutflows)}</p></div>
+            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Saida considerada no fechamento</p><p className="mt-1 font-extrabold text-emerald-700">{formatCurrency(selectedClosing.purchaseOutflows)}</p></div>
           </div>
 
           <div className="border-t border-slate-200/80">

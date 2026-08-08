@@ -179,6 +179,8 @@ export default function ContractsPage() {
         queryClient.invalidateQueries({ queryKey: ['contract-documents'] }),
         queryClient.invalidateQueries({ queryKey: ['devices'] }),
         queryClient.invalidateQueries({ queryKey: ['installments'] }),
+        queryClient.invalidateQueries({ queryKey: ['payments'] }),
+        queryClient.invalidateQueries({ queryKey: ['cash-transactions'] }),
         queryClient.invalidateQueries({ queryKey: ['rental-overview'] }),
       ]);
       setNotice(result.edited
