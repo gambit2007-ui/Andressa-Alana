@@ -92,7 +92,7 @@ describe('fechamento mensal de caixa', () => {
       transaction('2026-08-04', 'in', 'deposit_received', 1235),
     ], [
       { purchase_date: '2026-08-05', purchase_amount: 12800 },
-      { purchase_date: '2026-08-06', purchase_amount: 8785 },
+      { purchase_date: '2026-08-06', purchase_amount: 7980 },
     ], '2026-08');
 
     expect(closing).toMatchObject({
@@ -103,10 +103,10 @@ describe('fechamento mensal de caixa', () => {
       depositIncome: 3865,
       totalEntries: 28215,
       recordedPurchaseOutflows: 0,
-      inventoryPurchases: 21585,
-      purchaseOutflows: 21585,
-      totalOutflows: 21585,
-      closingBalance: 6630,
+      inventoryPurchases: 20780,
+      purchaseOutflows: 20780,
+      totalOutflows: 20780,
+      closingBalance: 7435,
     });
   });
 });

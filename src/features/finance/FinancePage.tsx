@@ -295,8 +295,9 @@ export default function FinancePage() {
   const professionalStats = useMemo(() => ({
     currentCash: currentClosing?.closingBalance ?? 0,
     capitalAdded: monthlyClosings.reduce((sum, closing) => sum + closing.capitalAdded, 0),
+    directSales: monthlyClosings.reduce((sum, closing) => sum + closing.salesIncome, 0),
+    depositsReceived: monthlyClosings.reduce((sum, closing) => sum + closing.depositIncome, 0),
     inventoryInvestment: (devicesQuery.data ?? []).reduce((sum, device) => sum + device.purchase_amount, 0),
-    extraExpenses: monthlyClosings.reduce((sum, closing) => sum + closing.extraExpenses, 0),
   }), [currentClosing?.closingBalance, devicesQuery.data, monthlyClosings]);
   const cashRows = useMemo(() => (cashQuery.data ?? []).filter((item) => (
     item.occurred_on.slice(0, 7) === selectedClosing?.month
@@ -364,12 +365,13 @@ export default function FinancePage() {
       {cashQuery.error && <ErrorState error={cashQuery.error} />}
       {devicesQuery.error && <ErrorState error={devicesQuery.error} />}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: 'Caixa atual', value: professionalStats.currentCash, icon: Landmark, tone: professionalStats.currentCash >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50', detail: 'Saldo financeiro registrado' },
-          { label: 'Adicionado ao caixa', value: professionalStats.capitalAdded, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50', detail: 'Aportes acumulados' },
-          { label: 'Gasto em compras', value: professionalStats.inventoryInvestment, icon: Smartphone, tone: 'text-blue-700 bg-blue-50', detail: 'Investimento nos aparelhos' },
-          { label: 'Despesas extras', value: professionalStats.extraExpenses, icon: ReceiptText, tone: 'text-amber-700 bg-amber-50', detail: 'Operacao, taxas e manutencao' },
+          { label: 'Caixa total', value: professionalStats.currentCash, icon: Landmark, tone: professionalStats.currentCash >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50', detail: 'Entradas confirmadas menos todas as saidas' },
+          { label: 'Aportes', value: professionalStats.capitalAdded, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50', detail: 'Capital adicionado ao caixa' },
+          { label: 'Venda direta', value: professionalStats.directSales, icon: Banknote, tone: 'text-blue-700 bg-blue-50', detail: 'Recebimentos por aparelhos vendidos' },
+          { label: 'Caucoes', value: professionalStats.depositsReceived, icon: Scale, tone: 'text-amber-700 bg-amber-50', detail: 'Garantias recebidas nos contratos' },
+          { label: 'Compras de estoque', value: professionalStats.inventoryInvestment, icon: Smartphone, tone: 'text-red-700 bg-red-50', detail: 'Valor usado na aquisicao de aparelhos' },
         ].map((item) => (
           <article key={item.label} className="metric-card flex items-center gap-4">
             <div className={`grid h-11 w-11 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></div>
