@@ -1,7 +1,8 @@
 import { addMonths, format, parseISO } from 'date-fns';
 import type { CashTransaction, Device } from '../types';
 
-type ClosingTransaction = Pick<CashTransaction, 'amount' | 'direction' | 'kind' | 'occurred_on' | 'status'>;
+type ClosingTransaction = Pick<CashTransaction, 'amount' | 'direction' | 'kind' | 'occurred_on' | 'status'>
+  & Partial<Pick<CashTransaction, 'description'>>;
 type ClosingDevice = Pick<Device, 'purchase_amount' | 'purchase_date'>;
 
 export type MonthlyCashClosing = {
@@ -29,6 +30,13 @@ const purchaseKinds = new Set(['asset_purchase', 'device_purchase', 'supplier'])
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 const monthKey = (value: string) => value.slice(0, 7);
+
+const isLegacyDeposit = (transaction: ClosingTransaction) => transaction.kind === 'rental_payment'
+  && (transaction.description ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .includes('caucao');
 
 const monthRange = (start: string, end: string): string[] => {
   const result: string[] = [];
@@ -63,9 +71,13 @@ export function buildMonthlyCashClosings(
     const sumEntries = (kind: string) => entries
       .filter((transaction) => transaction.kind === kind)
       .reduce((sum, transaction) => sum + transaction.amount, 0);
-    const rentalIncome = sumEntries('rental_payment');
+    const rentalIncome = entries
+      .filter((transaction) => transaction.kind === 'rental_payment' && !isLegacyDeposit(transaction))
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
     const salesIncome = sumEntries('device_sale');
-    const depositIncome = sumEntries('deposit_received');
+    const depositIncome = entries
+      .filter((transaction) => transaction.kind === 'deposit_received' || isLegacyDeposit(transaction))
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
     const capitalAdded = sumEntries('capital_contribution');
     const otherIncome = entries
       .filter((transaction) => !['rental_payment', 'device_sale', 'deposit_received', 'capital_contribution'].includes(transaction.kind))

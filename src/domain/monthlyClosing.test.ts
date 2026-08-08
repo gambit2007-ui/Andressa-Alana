@@ -7,7 +7,8 @@ const transaction = (
   kind: string,
   amount: number,
   status: 'confirmed' | 'reversed' = 'confirmed',
-) => ({ occurred_on, direction, kind, amount, status });
+  description?: string,
+) => ({ occurred_on, direction, kind, amount, status, description });
 
 describe('fechamento mensal de caixa', () => {
   it('separa aportes, receitas, compras e despesas extras', () => {
@@ -63,23 +64,31 @@ describe('fechamento mensal de caixa', () => {
     });
   });
 
-  it('calcula o caixa com aportes e recebimentos menos as compras cadastradas', () => {
+  it('reconcilia aportes, venda e caucoes antigas menos as compras de estoque', () => {
     const [closing] = buildMonthlyCashClosings([
-      transaction('2026-08-01', 'in', 'capital_contribution', 18050),
-      transaction('2026-08-02', 'in', 'rental_payment', 1330),
-      transaction('2026-08-03', 'in', 'deposit_received', 1235.90),
+      transaction('2026-08-01', 'in', 'capital_contribution', 3200),
+      transaction('2026-08-01', 'in', 'capital_contribution', 14850),
+      transaction('2026-08-02', 'in', 'device_sale', 3700),
+      transaction('2026-08-03', 'in', 'rental_payment', 850, 'confirmed', 'Caucao recebida como primeira parcela'),
+      transaction('2026-08-03', 'in', 'rental_payment', 480, 'confirmed', 'Caução recebida como primeira parcela'),
+      transaction('2026-08-04', 'in', 'deposit_received', 1300),
+      transaction('2026-08-04', 'in', 'deposit_received', 1235),
     ], [
-      { purchase_date: '2026-08-04', purchase_amount: 12800 },
-      { purchase_date: '2026-08-05', purchase_amount: 7980 },
+      { purchase_date: '2026-08-05', purchase_amount: 12800 },
+      { purchase_date: '2026-08-06', purchase_amount: 7980 },
     ], '2026-08');
 
     expect(closing).toMatchObject({
-      totalEntries: 20615.90,
+      capitalAdded: 18050,
+      salesIncome: 3700,
+      rentalIncome: 0,
+      depositIncome: 3865,
+      totalEntries: 25615,
       recordedPurchaseOutflows: 0,
       inventoryPurchases: 20780,
       purchaseOutflows: 20780,
       totalOutflows: 20780,
-      closingBalance: -164.10,
+      closingBalance: 4835,
     });
   });
 });
