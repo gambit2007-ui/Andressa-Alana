@@ -309,7 +309,7 @@ export default function FinancePage() {
     capitalAdded: monthlyClosings.reduce((sum, closing) => sum + closing.capitalAdded, 0),
     directSales: monthlyClosings.reduce((sum, closing) => sum + closing.salesIncome, 0),
     depositsReceived: monthlyClosings.reduce((sum, closing) => sum + closing.depositIncome, 0),
-    inventoryInvestment: (devicesQuery.data ?? []).reduce((sum, device) => sum + device.purchase_amount, 0),
+    inventoryInvestment: monthlyClosings.reduce((sum, closing) => sum + closing.purchaseOutflows, 0),
     operatingExpenses: monthlyClosings.reduce((sum, closing) => sum + closing.extraExpenses, 0),
   }), [currentClosing?.closingBalance, devicesQuery.data, monthlyClosings]);
   const cashRows = useMemo(() => (cashQuery.data ?? []).filter((item) => (

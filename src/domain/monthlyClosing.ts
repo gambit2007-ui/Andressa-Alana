@@ -101,9 +101,8 @@ export function buildMonthlyCashClosings(
     const inventoryPurchases = devices
       .filter((device) => monthKey(device.purchase_date) === month)
       .reduce((sum, device) => sum + device.purchase_amount, 0);
-    // Registered inventory is the source of truth for device purchases. Manual
-    // purchase entries remain a fallback for historical months without devices.
-    const purchaseOutflows = inventoryPurchases > 0 ? inventoryPurchases : recordedPurchaseOutflows;
+    // Device records and manual purchase entries are separate stock acquisitions.
+    const purchaseOutflows = inventoryPurchases + recordedPurchaseOutflows;
     const totalOutflows = purchaseOutflows + extraExpenses + reversals + ownerWithdrawals;
     const openingBalance = runningBalance;
     const netMovement = totalEntries - totalOutflows;

@@ -519,18 +519,35 @@ export async function consolidateCashLedger(
     .eq('status', 'confirmed');
   throwIfError(freightQueryError);
 
-  const freightRows = (freightData ?? []) as unknown as CashTransaction[];
-  const describedFreightRows = freightRows.filter((transaction) => {
+  const amountRows = (freightData ?? []) as unknown as CashTransaction[];
+  const purchaseRows = amountRows.filter((transaction) => transaction.kind === 'supplier');
+  const existingPurchase = purchaseRows[0];
+  if (!existingPurchase) {
+    const { data, error } = await client.from('cash_transactions').insert({
+      organization_id: organizationId,
+      kind: 'supplier',
+      direction: 'out',
+      amount: 1200,
+      occurred_on: occurredOn,
+      description: 'Compra de estoque complementar',
+      status: 'confirmed',
+    }).select('*').single();
+    throwIfError(error);
+    if (!data) throw new Error('Nao foi possivel registrar a compra complementar.');
+  } else if (existingPurchase.description.toLowerCase().includes('frete')
+    || existingPurchase.description.toLowerCase().includes('wendel')) {
+    const { error } = await client.from('cash_transactions')
+      .update({ description: 'Compra de estoque complementar' })
+      .eq('id', existingPurchase.id);
+    throwIfError(error);
+  }
+
+  const describedFreightRows = amountRows.filter((transaction) => {
     const description = transaction.description.trim().toLowerCase();
-    return description.includes('frete') || description.includes('wendel');
+    return transaction.kind === 'operating_expense'
+      && (description.includes('frete') || description.includes('wendel'));
   });
-  const supplierRows = freightRows.filter((transaction) => transaction.kind === 'supplier');
-  const freightCandidates = [...new Map([
-    ...describedFreightRows,
-    ...(supplierRows.length === 1 ? supplierRows : []),
-  ].map((transaction) => [transaction.id, transaction])).values()];
-  let canonicalFreight = freightCandidates.find((transaction) => transaction.kind === 'operating_expense')
-    ?? freightCandidates[0];
+  const canonicalFreight = describedFreightRows[0];
   let freightCreated = false;
 
   if (!canonicalFreight) {
@@ -545,18 +562,9 @@ export async function consolidateCashLedger(
     });
     throwIfError(error);
     freightCreated = true;
-  } else if (canonicalFreight.kind !== 'operating_expense'
-    || canonicalFreight.description !== wendelFreightDescription) {
-    const { data, error } = await client.from('cash_transactions')
-      .update({ kind: 'operating_expense', description: wendelFreightDescription })
-      .eq('id', canonicalFreight.id)
-      .select('*')
-      .single();
-    throwIfError(error);
-    canonicalFreight = data as unknown as CashTransaction;
   }
 
-  const duplicateFreightIds = freightCandidates
+  const duplicateFreightIds = describedFreightRows
     .filter((transaction) => transaction.id !== canonicalFreight?.id)
     .map((transaction) => transaction.id);
   if (duplicateFreightIds.length > 0) {
