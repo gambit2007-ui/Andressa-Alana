@@ -21,8 +21,8 @@ export default defineConfig(() => {
             if (!id.includes('node_modules')) return undefined;
             if (id.includes('@supabase')) return 'supabase';
             if (id.includes('@tanstack')) return 'query';
+            if (id.includes('pdf-lib') || id.includes('@pdf-lib')) return 'pdf';
             if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) return 'forms';
-            if (id.includes('react') || id.includes('motion')) return 'react-vendor';
             return 'vendor';
           },
         },

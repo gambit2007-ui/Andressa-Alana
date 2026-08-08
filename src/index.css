@@ -259,6 +259,142 @@ button:disabled { cursor: not-allowed; }
   box-shadow: 0 5px 16px rgba(7, 16, 31, 0.04);
 }
 
+.finance-hero {
+  @apply relative flex flex-col gap-8 overflow-hidden border p-6 text-white lg:flex-row lg:items-end lg:justify-between lg:p-9;
+  min-height: 15.5rem;
+  border-color: rgba(229, 198, 116, 0.22);
+  border-radius: 1.75rem;
+  background:
+    radial-gradient(circle at 88% 14%, rgba(229, 198, 116, 0.2), transparent 18rem),
+    linear-gradient(135deg, #0c3765 0%, #061a35 55%, #030d1d 100%);
+  box-shadow: 0 28px 70px rgba(5, 30, 59, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.finance-hero::after {
+  position: absolute;
+  right: -3rem;
+  bottom: -6rem;
+  width: 21rem;
+  height: 21rem;
+  border: 1px solid rgba(229, 198, 116, 0.12);
+  border-radius: 50%;
+  content: "";
+  box-shadow: 0 0 0 3rem rgba(229, 198, 116, 0.025), 0 0 0 7rem rgba(229, 198, 116, 0.02);
+}
+
+.finance-kicker {
+  @apply text-[9px] font-extrabold uppercase tracking-[0.24em];
+}
+
+.finance-select {
+  @apply h-11 w-full border px-3 text-sm font-bold text-white outline-none;
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 0.75rem;
+  background: rgba(1, 12, 28, 0.62);
+}
+
+.finance-select option { color: #0f172a; background: white; }
+
+.finance-action {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 border px-4 text-xs font-extrabold uppercase tracking-wide text-ink-950 transition;
+  border-color: rgba(229, 198, 116, 0.38);
+  border-radius: 0.8rem;
+  background: linear-gradient(145deg, #efd695, #c99b42);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.finance-action:hover { transform: translateY(-1px); filter: brightness(1.04); }
+.finance-action-muted { color: #e2e8f0; border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.055); }
+
+.finance-metrics-scroll {
+  @apply -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-4 xl:grid-cols-7;
+  scrollbar-width: thin;
+}
+
+.finance-metric-card {
+  @apply min-w-[12.5rem] snap-start border bg-white/92 p-4 sm:min-w-0;
+  border-color: var(--line);
+  border-radius: 1.25rem;
+  box-shadow: 0 14px 34px rgba(12, 48, 84, 0.065), inset 0 1px 0 white;
+}
+
+.finance-profit-strip {
+  @apply grid gap-5 border bg-white/90 p-5 sm:p-6 lg:grid-cols-[1.4fr_1fr_1fr_0.75fr] lg:items-center;
+  border-color: var(--line);
+  border-radius: 1.5rem;
+  box-shadow: 0 16px 44px rgba(12, 48, 84, 0.07);
+}
+
+.finance-profit-stat {
+  @apply flex min-h-16 flex-col justify-center border-l-2 border-gold-300 pl-4;
+}
+
+.finance-profit-stat span { @apply text-[9px] font-extrabold uppercase tracking-[0.15em] text-slate-400; }
+.finance-profit-stat strong { @apply mt-1 text-lg font-extrabold text-slate-950; }
+.finance-profit-stat small { @apply mt-0.5 text-[10px] text-slate-400; }
+
+.finance-month-row {
+  @apply grid w-full grid-cols-2 items-center gap-3 px-5 py-4 text-left transition sm:px-6 lg:grid-cols-[72px_1fr_1fr_1fr_1.15fr_auto_18px];
+}
+
+.finance-month-row:hover, .finance-month-row.is-selected { background: rgba(238, 244, 251, 0.82); }
+.finance-month-row > strong { @apply text-xs font-extrabold tracking-wider text-slate-950; }
+.finance-month-row > span:not(.finance-month-status) { @apply flex items-center justify-between gap-3 lg:block; }
+.finance-month-row small { @apply text-[8px] font-extrabold uppercase tracking-wider text-slate-400; }
+.finance-month-row b { @apply block text-xs lg:mt-1; }
+
+.finance-month-status {
+  @apply inline-flex w-fit items-center rounded-full bg-amber-50 px-2.5 py-1 text-[8px] font-extrabold uppercase tracking-wider text-amber-700;
+}
+
+.finance-month-status.is-closed { @apply bg-emerald-50 text-emerald-700; }
+
+.finance-month-detail {
+  @apply border-t border-slate-200/80 bg-slate-50/75 p-5 sm:p-6;
+  box-shadow: inset 0 18px 32px rgba(12, 48, 84, 0.025);
+}
+
+.finance-detail-metric {
+  @apply flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4;
+}
+
+.finance-detail-metric span { @apply text-[9px] font-extrabold uppercase tracking-wider text-slate-400; }
+.finance-detail-metric strong { @apply mt-2 text-base font-extrabold; }
+
+.finance-breakdown {
+  @apply rounded-2xl border bg-white p-5;
+}
+
+.finance-breakdown h3 { @apply mb-4 flex items-center gap-2 text-sm font-extrabold; }
+.finance-breakdown p { @apply flex items-center justify-between gap-4 border-t border-slate-100 py-2.5 text-xs; }
+.finance-breakdown p span { @apply text-slate-500; }
+.finance-breakdown p strong { @apply text-slate-900; }
+.finance-breakdown-in { @apply border-emerald-100; }
+.finance-breakdown-in h3, .finance-breakdown-in p strong { @apply text-emerald-800; }
+.finance-breakdown-out { @apply border-red-100; }
+.finance-breakdown-out h3, .finance-breakdown-out p strong { @apply text-red-800; }
+
+.finance-chart {
+  @apply min-h-64 rounded-2xl border border-blue-100 bg-white p-5;
+  background-image: linear-gradient(to top, rgba(53, 104, 157, 0.06) 1px, transparent 1px);
+  background-size: 100% 25%;
+}
+
+.finance-chart-grid { @apply grid h-52 grid-cols-4 items-end gap-3 pt-5; }
+
+.finance-result-card {
+  @apply grid grid-cols-[auto_1fr] items-center gap-x-2 rounded-2xl border border-slate-200 bg-white p-4;
+}
+
+.finance-result-card span { @apply text-[9px] font-extrabold uppercase tracking-wider text-slate-400; }
+.finance-result-card strong { @apply col-span-2 mt-2 text-lg font-extrabold; }
+
+@media (max-width: 1023px) {
+  .finance-month-row > svg { position: absolute; right: 1.25rem; }
+  .finance-month-row { position: relative; padding-right: 3rem; }
+  .finance-month-status { margin-top: 0.25rem; }
+}
+
 .btn-secondary:hover { border-color: rgba(157, 113, 41, 0.45); background: #fbfdff; }
 
 .btn-danger {

@@ -8,7 +8,9 @@ import type {
   ContractDocument,
   ContractDocumentType,
   Device,
+  DevicePhoto,
   DeviceSale,
+  FinancialMonthClosing,
   Installment,
   MdmCommand,
   MdmDevice,
@@ -190,6 +192,56 @@ export async function listDevices(): Promise<Device[]> {
   const { data, error } = await db().from('devices').select('*').order('created_at', { ascending: false });
   throwIfError(error);
   return ((data ?? []) as unknown as Device[]).map(normalizeDevice);
+}
+
+export async function listDevicePhotos(deviceId: string): Promise<DevicePhoto[]> {
+  const { data, error } = await db()
+    .from('device_photos')
+    .select('*')
+    .eq('device_id', deviceId)
+    .order('created_at');
+  throwIfError(error);
+  const photos = (data ?? []) as unknown as DevicePhoto[];
+  return Promise.all(photos.map(async (photo) => {
+    const { data: signedData, error: signedError } = await db().storage
+      .from(photo.bucket_id)
+      .createSignedUrl(photo.storage_path, 3600);
+    return { ...photo, signed_url: signedError ? null : signedData.signedUrl };
+  }));
+}
+
+export async function uploadDevicePhotos(input: {
+  organizationId: string;
+  deviceId: string;
+  files: File[];
+}): Promise<{ uploaded: number; failed: string[] }> {
+  const results = await Promise.allSettled(input.files.map(async (file) => {
+    const path = `${input.organizationId}/${input.deviceId}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
+    const { error: uploadError } = await db().storage.from('device-photos').upload(path, file, {
+      upsert: false,
+      contentType: file.type,
+      cacheControl: '3600',
+    });
+    throwIfError(uploadError);
+
+    const caption = file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim() || 'Foto do aparelho';
+    const { error: metadataError } = await db().from('device_photos').insert({
+      organization_id: input.organizationId,
+      device_id: input.deviceId,
+      bucket_id: 'device-photos',
+      storage_path: path,
+      caption,
+    });
+    if (metadataError) {
+      await db().storage.from('device-photos').remove([path]);
+      throwIfError(metadataError);
+    }
+  }));
+
+  const failed = results.flatMap((result, index) => result.status === 'rejected'
+    ? [`${input.files[index]?.name ?? 'Imagem'}: ${result.reason instanceof Error ? result.reason.message : 'falha no envio'}`]
+    : []);
+  return { uploaded: results.length - failed.length, failed };
 }
 
 const deviceWritePayload = (values: DeviceFormData) => ({
@@ -435,6 +487,37 @@ export async function listCashTransactions(): Promise<CashTransaction[]> {
   const { data, error } = await db().from('cash_transactions').select('*').order('occurred_on', { ascending: false });
   throwIfError(error);
   return ((data ?? []) as unknown as CashTransaction[]).map((row) => ({ ...row, amount: toMoney(row.amount) }));
+}
+
+export async function listFinancialMonthClosings(): Promise<{ items: FinancialMonthClosing[]; available: boolean }> {
+  const { data, error } = await db()
+    .from('financial_month_closings')
+    .select('*')
+    .order('month', { ascending: false });
+  if (error && ['PGRST205', '42P01'].includes((error as { code?: string }).code ?? '')) {
+    return { items: [], available: false };
+  }
+  throwIfError(error);
+  return { items: (data ?? []) as unknown as FinancialMonthClosing[], available: true };
+}
+
+export async function closeFinancialMonth(
+  organizationId: string,
+  month: string,
+  snapshot: Record<string, unknown>,
+): Promise<string> {
+  const { data, error } = await db().rpc('close_financial_month', {
+    p_organization_id: organizationId,
+    p_month: `${month}-01`,
+    p_snapshot: snapshot,
+  });
+  throwIfError(error);
+  return String(data);
+}
+
+export async function reopenFinancialMonth(closingId: string): Promise<void> {
+  const { error } = await db().rpc('reopen_financial_month', { p_closing_id: closingId });
+  throwIfError(error);
 }
 
 export async function createCashTransaction(

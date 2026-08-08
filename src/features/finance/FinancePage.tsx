@@ -6,7 +6,6 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Banknote,
-  CalendarDays,
   CheckCircle2,
   ChevronDown,
   Clock3,
@@ -23,18 +22,28 @@ import {
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
+import { FinancialExecutivePanel } from './FinancialExecutivePanel';
 import {
+  closeFinancialMonth,
   consolidateCashLedger,
   createCashTransaction,
   listCashTransactions,
   listDevices,
+  listDeviceSales,
+  listFinancialMonthClosings,
   listInstallments,
   listPayments,
   recordClientPayment,
+  reopenFinancialMonth,
   reversePayment,
 } from '../../repositories/rentalRepository';
 import { selectCashBookRows } from '../../domain/cashBook';
-import { buildMonthlyCashClosings } from '../../domain/monthlyClosing';
+import {
+  availableFinanceYears,
+  buildProfessionalFinance,
+  serializeMonthSnapshot,
+  type ProfessionalMonthMetrics,
+} from '../../domain/professionalFinance';
 import { cashTransactionSchema, type CashTransactionFormData } from '../../schemas/forms';
 import type { Installment, InstallmentStatus, Payment } from '../../types';
 import { formatCurrency, formatDate, formatMonthLabel } from '../../utils/formatters';
@@ -136,6 +145,11 @@ type PaymentReceipt = {
   reversalReason: string | null;
 };
 
+type MonthAction = {
+  type: 'close' | 'reopen';
+  month: ProfessionalMonthMetrics;
+};
+
 const buildClientGroups = (installments: Installment[]): ClientFinanceGroup[] => {
   const grouped = new Map<string, { name: string; cpf: string; installments: Installment[] }>();
 
@@ -206,6 +220,7 @@ export default function FinancePage() {
   const [status, setStatus] = useState<'all' | InstallmentStatus>('all');
   const [cashFilter, setCashFilter] = useState<'all' | 'in' | 'out'>('all');
   const [selectedMonth, setSelectedMonth] = useState(today().slice(0, 7));
+  const [selectedYear, setSelectedYear] = useState(Number(today().slice(0, 4)));
   const [cashModalOpen, setCashModalOpen] = useState(false);
   const [consolidationOpen, setConsolidationOpen] = useState(false);
   const [consolidationNotice, setConsolidationNotice] = useState<string | null>(null);
@@ -216,10 +231,13 @@ export default function FinancePage() {
   const [paymentDate, setPaymentDate] = useState(today());
   const [paymentNotes, setPaymentNotes] = useState('');
   const [reversalReason, setReversalReason] = useState('');
+  const [monthAction, setMonthAction] = useState<MonthAction | null>(null);
   const installmentsQuery = useQuery({ queryKey: ['installments'], queryFn: listInstallments, refetchOnMount: 'always' });
   const paymentsQuery = useQuery({ queryKey: ['payments'], queryFn: listPayments, refetchOnMount: 'always' });
   const cashQuery = useQuery({ queryKey: ['cash-transactions'], queryFn: listCashTransactions, refetchOnMount: 'always' });
   const devicesQuery = useQuery({ queryKey: ['devices'], queryFn: listDevices, refetchOnMount: 'always' });
+  const salesQuery = useQuery({ queryKey: ['device-sales'], queryFn: listDeviceSales, refetchOnMount: 'always' });
+  const closingsQuery = useQuery({ queryKey: ['financial-month-closings'], queryFn: listFinancialMonthClosings, refetchOnMount: 'always' });
   const cashForm = useForm<CashTransactionFormData>({
     resolver: zodResolver(cashTransactionSchema),
     defaultValues: cashDefaults(),
@@ -231,6 +249,7 @@ export default function FinancePage() {
       queryClient.invalidateQueries({ queryKey: ['installments'] }),
       queryClient.invalidateQueries({ queryKey: ['payments'] }),
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['financial-month-closings'] }),
       queryClient.invalidateQueries({ queryKey: ['rental-overview'] }),
       queryClient.invalidateQueries({ queryKey: ['profitability'] }),
     ]);
@@ -277,6 +296,28 @@ export default function FinancePage() {
     },
   });
 
+  const closeMonthMutation = useMutation({
+    mutationFn: (month: ProfessionalMonthMetrics) => closeFinancialMonth(
+      profile.organization_id,
+      month.month,
+      serializeMonthSnapshot(month),
+    ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['financial-month-closings'] });
+      setConsolidationNotice('Mes financeiro fechado. O snapshot foi preservado para auditoria.');
+      setMonthAction(null);
+    },
+  });
+
+  const reopenMonthMutation = useMutation({
+    mutationFn: (month: ProfessionalMonthMetrics) => reopenFinancialMonth(month.closingId!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['financial-month-closings'] });
+      setConsolidationNotice('Mes financeiro reaberto para ajustes.');
+      setMonthAction(null);
+    },
+  });
+
   const clientGroups = useMemo(() => buildClientGroups(installmentsQuery.data ?? []), [installmentsQuery.data]);
   const receipts = useMemo(() => buildReceipts(paymentsQuery.data ?? []), [paymentsQuery.data]);
   const receiptsByClient = useMemo(() => {
@@ -297,29 +338,30 @@ export default function FinancePage() {
     overdue: clientGroups.reduce((sum, group) => sum + group.overdue, 0),
   }), [clientGroups]);
 
-  const monthlyClosings = useMemo(() => buildMonthlyCashClosings(
+  const referenceMonth = today().slice(0, 7);
+  const financeYears = useMemo(() => availableFinanceYears(
     cashQuery.data ?? [],
     devicesQuery.data ?? [],
-    today().slice(0, 7),
-  ), [cashQuery.data, devicesQuery.data]);
-  const selectedClosing = monthlyClosings.find((closing) => closing.month === selectedMonth)
-    ?? monthlyClosings[monthlyClosings.length - 1];
-  const currentClosing = monthlyClosings[monthlyClosings.length - 1];
-  const professionalStats = useMemo(() => ({
-    currentCash: currentClosing?.closingBalance ?? 0,
-    capitalAdded: monthlyClosings.reduce((sum, closing) => sum + closing.capitalAdded, 0),
-    directSales: monthlyClosings.reduce((sum, closing) => sum + closing.salesIncome, 0),
-    depositsReceived: monthlyClosings.reduce((sum, closing) => sum + closing.depositIncome, 0),
-    inventoryInvestment: (devicesQuery.data ?? []).reduce((sum, device) => sum + device.purchase_amount, 0),
-    operatingExpenses: monthlyClosings.reduce((sum, closing) => sum + closing.extraExpenses, 0),
-  }), [currentClosing?.closingBalance, devicesQuery.data, monthlyClosings]);
+    Number(referenceMonth.slice(0, 4)),
+  ), [cashQuery.data, devicesQuery.data, referenceMonth]);
+  const financeSummary = useMemo(() => buildProfessionalFinance({
+    transactions: cashQuery.data ?? [],
+    devices: devicesQuery.data ?? [],
+    installments: installmentsQuery.data ?? [],
+    sales: salesQuery.data ?? [],
+    closings: closingsQuery.data?.items ?? [],
+    selectedYear,
+    referenceDate: today(),
+  }), [cashQuery.data, closingsQuery.data, devicesQuery.data, installmentsQuery.data, salesQuery.data, selectedYear]);
+  const selectedClosing = financeSummary.months.find((closing) => closing.month === selectedMonth)
+    ?? financeSummary.months[financeSummary.months.length - 1];
   const cashRows = useMemo(() => selectCashBookRows(
     cashQuery.data ?? [],
-    selectedClosing?.month,
+    selectedMonth,
     cashFilter,
-  ), [cashFilter, cashQuery.data, selectedClosing?.month]);
+  ), [cashFilter, cashQuery.data, selectedMonth]);
 
-  if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading || devicesQuery.isLoading) return <LoadingState />;
+  if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading || devicesQuery.isLoading || salesQuery.isLoading || closingsQuery.isLoading) return <LoadingState />;
   const canManageFinance = ['admin', 'manager', 'finance'].includes(profile.role);
   const canConsolidateFinance = ['admin', 'manager'].includes(profile.role);
   const categories = cashDirection === 'in' ? entryCategories : withdrawalCategories;
@@ -363,6 +405,29 @@ export default function FinancePage() {
     setReversalReason('');
   };
 
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    setSelectedMonth(year === Number(referenceMonth.slice(0, 4)) ? referenceMonth : `${year}-12`);
+  };
+
+  const downloadAnnualReport = async () => {
+    const { createAnnualFinancialReport, downloadFinancialFile } = await import('../../domain/financialReports');
+    const blob = await createAnnualFinancialReport(financeSummary);
+    downloadFinancialFile(blob, `vantage-financeiro-${financeSummary.selectedYear}.pdf`);
+  };
+
+  const downloadMonthlyReport = async (month: ProfessionalMonthMetrics) => {
+    const { createMonthlyFinancialReport, downloadFinancialFile } = await import('../../domain/financialReports');
+    const blob = await createMonthlyFinancialReport(month);
+    downloadFinancialFile(blob, `vantage-fechamento-${month.month}.pdf`);
+  };
+
+  const downloadCsv = async () => {
+    const { createCashTransactionsCsv, downloadFinancialFile } = await import('../../domain/financialReports');
+    const transactions = (cashQuery.data ?? []).filter((transaction) => transaction.occurred_on.startsWith(`${selectedYear}-`));
+    downloadFinancialFile(createCashTransactionsCsv(transactions), `vantage-livro-caixa-${selectedYear}.csv`);
+  };
+
   return (
     <div className="space-y-7">
       <PageHeader
@@ -380,75 +445,25 @@ export default function FinancePage() {
       {paymentsQuery.error && <ErrorState error={paymentsQuery.error} />}
       {cashQuery.error && <ErrorState error={cashQuery.error} />}
       {devicesQuery.error && <ErrorState error={devicesQuery.error} />}
+      {salesQuery.error && <ErrorState error={salesQuery.error} />}
+      {closingsQuery.error && <ErrorState error={closingsQuery.error} />}
       {consolidationNotice && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">{consolidationNotice}</div>}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        {[
-          { label: 'Caixa total', value: professionalStats.currentCash, icon: Landmark, tone: professionalStats.currentCash >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50', detail: 'Entradas confirmadas menos todas as saidas' },
-          { label: 'Aportes', value: professionalStats.capitalAdded, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50', detail: 'Capital adicionado ao caixa' },
-          { label: 'Venda direta', value: professionalStats.directSales, icon: Banknote, tone: 'text-blue-700 bg-blue-50', detail: 'Recebimentos por aparelhos vendidos' },
-          { label: 'Caucoes', value: professionalStats.depositsReceived, icon: Scale, tone: 'text-amber-700 bg-amber-50', detail: 'Garantias recebidas nos contratos' },
-          { label: 'Compras de estoque', value: professionalStats.inventoryInvestment, icon: Smartphone, tone: 'text-red-700 bg-red-50', detail: 'Valor usado na aquisicao de aparelhos' },
-          { label: 'Despesas operacionais', value: professionalStats.operatingExpenses, icon: ReceiptText, tone: 'text-orange-700 bg-orange-50', detail: 'Fretes, taxas, manutencao e operacao' },
-        ].map((item) => (
-          <article key={item.label} className="metric-card flex items-center gap-4">
-            <div className={`grid h-11 w-11 place-items-center rounded-xl ${item.tone}`}><item.icon className="h-5 w-5" /></div>
-            <div><p className="text-xs font-bold uppercase tracking-wider text-slate-400">{item.label}</p><p className="mt-1 text-xl font-extrabold text-slate-950">{formatCurrency(item.value)}</p><p className="mt-1 text-[10px] text-slate-400">{item.detail}</p></div>
-          </article>
-        ))}
-      </div>
-
-      {selectedClosing && (
-        <section className="panel overflow-hidden p-0">
-          <div className="flex flex-col gap-4 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div><p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-cyan-700">Controle gerencial</p><h2 className="mt-1 font-display text-2xl text-slate-950">Fechamento mensal</h2></div>
-            <label className="form-field sm:w-56"><span>Mes de referencia</span><select className="input" value={selectedClosing.month} onChange={(event) => setSelectedMonth(event.target.value)}>{[...monthlyClosings].reverse().map((closing) => <option key={closing.month} value={closing.month}>{formatMonthLabel(closing.month)}</option>)}</select></label>
-          </div>
-
-          <div className="grid gap-px bg-slate-200/80 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              { label: 'Saldo inicial', value: selectedClosing.openingBalance, tone: 'text-slate-700 bg-slate-50' },
-              { label: 'Entradas do mes', value: selectedClosing.totalEntries, tone: 'text-emerald-700 bg-emerald-50' },
-              { label: 'Saidas do mes', value: selectedClosing.totalOutflows, tone: 'text-red-700 bg-red-50' },
-              { label: 'Saldo final', value: selectedClosing.closingBalance, tone: selectedClosing.closingBalance >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50' },
-            ].map((item) => (
-              <article key={item.label} className="bg-white p-5"><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">{item.label}</p><p className={`mt-2 text-xl font-extrabold ${item.tone.split(' ')[0]}`}>{formatCurrency(item.value)}</p></article>
-            ))}
-          </div>
-
-          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
-            <article className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
-              <h3 className="flex items-center gap-2 font-extrabold text-emerald-900"><ArrowDownToLine className="h-4 w-4" />Composicao das entradas</h3>
-              <div className="mt-4 space-y-3 text-sm">
-                {[['Recebimentos de locacao', selectedClosing.rentalIncome], ['Vendas de aparelhos', selectedClosing.salesIncome], ['Caucoes recebidas', selectedClosing.depositIncome], ['Aportes ao caixa', selectedClosing.capitalAdded], ['Outras entradas', selectedClosing.otherIncome]].map(([label, value]) => <div key={String(label)} className="flex items-center justify-between gap-4"><span className="text-slate-600">{label}</span><strong className="text-emerald-800">{formatCurrency(Number(value))}</strong></div>)}
-              </div>
-            </article>
-            <article className="rounded-2xl border border-red-100 bg-red-50/40 p-5">
-              <h3 className="flex items-center gap-2 font-extrabold text-red-900"><ArrowUpFromLine className="h-4 w-4" />Composicao das saidas</h3>
-              <div className="mt-4 space-y-3 text-sm">
-                {[['Compras de aparelhos', selectedClosing.purchaseOutflows], ['Despesas extras', selectedClosing.extraExpenses], ['Estornos', selectedClosing.reversals], ['Retiradas', selectedClosing.ownerWithdrawals]].map(([label, value]) => <div key={String(label)} className="flex items-center justify-between gap-4"><span className="text-slate-600">{label}</span><strong className="text-red-800">{formatCurrency(Number(value))}</strong></div>)}
-              </div>
-            </article>
-          </div>
-
-          <div className="mx-5 mb-5 grid gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:mx-6 sm:mb-6 sm:grid-cols-3">
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Compras de estoque no mes</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.inventoryPurchases)}</p></div>
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Lancamentos manuais de compra</p><p className="mt-1 font-extrabold text-blue-950">{formatCurrency(selectedClosing.recordedPurchaseOutflows)}</p></div>
-            <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600">Saida considerada no fechamento</p><p className="mt-1 font-extrabold text-emerald-700">{formatCurrency(selectedClosing.purchaseOutflows)}</p></div>
-          </div>
-
-          <div className="border-t border-slate-200/80">
-            <div className="flex items-center gap-2 px-5 py-4 sm:px-6"><CalendarDays className="h-4 w-4 text-cyan-700" /><h3 className="font-extrabold text-slate-900">Historico de fechamentos</h3></div>
-            <div className="table-shell mx-5 mb-5 overflow-x-auto sm:mx-6 sm:mb-6">
-              <table className="min-w-[760px] w-full text-left text-xs">
-                <thead className="bg-slate-950 text-[10px] uppercase tracking-wider text-slate-300"><tr><th className="px-4 py-3">Mes</th><th className="px-4 py-3">Saldo inicial</th><th className="px-4 py-3">Entradas</th><th className="px-4 py-3">Saidas</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Saldo final</th><th className="px-4 py-3">Compras</th></tr></thead>
-                <tbody className="divide-y divide-slate-100 bg-white">{[...monthlyClosings].reverse().map((closing) => <tr key={closing.month} className={closing.month === selectedClosing.month ? 'bg-cyan-50/50' : ''}><td className="px-4 py-3 font-bold text-slate-900">{formatMonthLabel(closing.month)}</td><td className="px-4 py-3">{formatCurrency(closing.openingBalance)}</td><td className="px-4 py-3 font-semibold text-emerald-700">{formatCurrency(closing.totalEntries)}</td><td className="px-4 py-3 font-semibold text-red-700">{formatCurrency(closing.totalOutflows)}</td><td className={`px-4 py-3 font-bold ${closing.netMovement >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(closing.netMovement)}</td><td className="px-4 py-3 font-extrabold text-slate-950">{formatCurrency(closing.closingBalance)}</td><td className="px-4 py-3">{formatCurrency(closing.purchaseOutflows)}</td></tr>)}</tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      )}
-
+      <FinancialExecutivePanel
+        summary={financeSummary}
+        years={financeYears}
+        selectedMonth={selectedMonth}
+        currentMonth={referenceMonth}
+        canClose={canConsolidateFinance && Boolean(closingsQuery.data?.available)}
+        actionPending={closeMonthMutation.isPending || reopenMonthMutation.isPending}
+        onYearChange={handleYearChange}
+        onMonthChange={setSelectedMonth}
+        onCloseMonth={(month) => setMonthAction({ type: 'close', month })}
+        onReopenMonth={(month) => setMonthAction({ type: 'reopen', month })}
+        onAnnualReport={downloadAnnualReport}
+        onMonthlyReport={downloadMonthlyReport}
+        onCsvExport={downloadCsv}
+      />
       <section className="panel overflow-hidden p-0">
         <div className="flex flex-col gap-4 border-b border-slate-200/80 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
@@ -458,14 +473,14 @@ export default function FinancePage() {
           <select className="input sm:w-48" value={cashFilter} onChange={(event) => setCashFilter(event.target.value as 'all' | 'in' | 'out')}>
             <option value="all">Todas as movimentacoes</option>
             <option value="in">Somente entradas</option>
-            <option value="out">Somente retiradas</option>
+            <option value="out">Somente saidas</option>
           </select>
         </div>
 
         <div className="grid gap-px bg-slate-200/80 sm:grid-cols-3">
           {[
-            { label: 'Entradas do mes', value: selectedClosing?.totalEntries ?? 0, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50' },
-            { label: 'Saidas do mes', value: selectedClosing?.totalOutflows ?? 0, icon: ArrowUpFromLine, tone: 'text-red-700 bg-red-50' },
+            { label: 'Entradas do mes', value: selectedClosing?.cashEntries ?? 0, icon: ArrowDownToLine, tone: 'text-emerald-700 bg-emerald-50' },
+            { label: 'Saidas do mes', value: selectedClosing?.cashOutflows ?? 0, icon: ArrowUpFromLine, tone: 'text-red-700 bg-red-50' },
             { label: 'Saldo final', value: selectedClosing?.closingBalance ?? 0, icon: Scale, tone: (selectedClosing?.closingBalance ?? 0) >= 0 ? 'text-cyan-700 bg-cyan-50' : 'text-red-700 bg-red-50' },
           ].map((item) => (
             <article key={item.label} className="flex items-center gap-3 bg-white p-5">
@@ -593,6 +608,34 @@ export default function FinancePage() {
           </div>
         )}
       </section>
+
+      {monthAction && (
+        <Modal
+          title={monthAction.type === 'close' ? `Fechar ${formatMonthLabel(monthAction.month.month)}` : `Reabrir ${formatMonthLabel(monthAction.month.month)}`}
+          description={monthAction.type === 'close' ? 'Os valores atuais serao preservados em um snapshot auditavel.' : 'O mes voltara a aceitar ajustes financeiros.'}
+          onClose={() => { if (!closeMonthMutation.isPending && !reopenMonthMutation.isPending) setMonthAction(null); }}
+        >
+          <div className="space-y-5">
+            {closeMonthMutation.error && <ErrorState error={closeMonthMutation.error} />}
+            {reopenMonthMutation.error && <ErrorState error={reopenMonthMutation.error} />}
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+              <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Saldo final</p><p className="mt-1 font-extrabold text-slate-950">{formatCurrency(monthAction.month.closingBalance)}</p></div>
+              <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Resultado operacional</p><p className={`mt-1 font-extrabold ${monthAction.month.operationalResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(monthAction.month.operationalResult)}</p></div>
+            </div>
+            <p className="text-sm leading-6 text-slate-600">{monthAction.type === 'close' ? 'Aportes e compras de estoque permanecem no fluxo de caixa, mas nao alteram o resultado operacional. Para corrigir um mes fechado, sera necessario reabri-lo.' : 'O snapshot anterior continuara registrado na auditoria e um novo fechamento podera ser criado depois dos ajustes.'}</p>
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+              <button className="btn-secondary" type="button" disabled={closeMonthMutation.isPending || reopenMonthMutation.isPending} onClick={() => setMonthAction(null)}>Cancelar</button>
+              <button className="btn-primary" type="button" disabled={closeMonthMutation.isPending || reopenMonthMutation.isPending} onClick={() => {
+                if (monthAction.type === 'close') closeMonthMutation.mutate(monthAction.month);
+                else reopenMonthMutation.mutate(monthAction.month);
+              }}>
+                {monthAction.type === 'close' ? <Landmark className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                {closeMonthMutation.isPending || reopenMonthMutation.isPending ? 'Processando...' : monthAction.type === 'close' ? 'Confirmar fechamento' : 'Confirmar reabertura'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {consolidationOpen && (
         <Modal title="Consolidar caixa" description="Esta operacao preserva o historico e pode ser executada novamente sem duplicar valores." onClose={() => { if (!consolidationMutation.isPending) setConsolidationOpen(false); }}>

@@ -82,6 +82,17 @@ export type Device = {
   created_at: string;
 };
 
+export type DevicePhoto = {
+  id: string;
+  organization_id: string;
+  device_id: string;
+  bucket_id: 'device-photos';
+  storage_path: string;
+  caption: string | null;
+  created_at: string;
+  signed_url?: string | null;
+};
+
 export type DeviceSale = {
   id: string;
   organization_id: string;
@@ -230,6 +241,20 @@ export type CashTransaction = {
   occurred_on: string;
   description: string;
   status: 'confirmed' | 'reversed';
+};
+
+export type FinancialMonthClosing = {
+  id: string;
+  organization_id: string;
+  month: string;
+  status: 'closed' | 'reopened';
+  snapshot: Record<string, unknown>;
+  closed_at: string;
+  closed_by: string | null;
+  reopened_at: string | null;
+  reopened_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type MdmDevice = {
