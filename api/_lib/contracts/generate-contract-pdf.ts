@@ -3,94 +3,100 @@ import { formatCurrency, formatDate } from './formatters.js';
 import { ContractPdfWriter } from './pdf-writer.js';
 import type { ContractPdfData } from './types.js';
 
+const paymentMethodLabels: Record<string, string> = {
+  pix: 'PIX',
+  card: 'Cartão',
+  transfer: 'Transferência bancária',
+  cash: 'Dinheiro',
+  other: 'Outro',
+};
+
+const paymentMethodLabel = (method: string | null | undefined): string => (
+  method ? paymentMethodLabels[method] ?? method : 'Não informado'
+);
+
 export async function generateContractPdf(data: ContractPdfData): Promise<Uint8Array> {
   const pdf = await ContractPdfWriter.create();
-  pdf.addCover({
-    brand: 'Vantage iPhones',
-    title: 'Contrato de locação de smartphone',
-    subtitle: `${data.device.model} | ${data.lessee.name}`,
-    details: [
-      `Número do contrato: ${data.contractNumber}`,
-      `Data de emissão: ${formatDate(data.issuedAt)}`,
-      `Vigência: ${formatDate(data.startDate)} a ${formatDate(data.endDate)}`,
-    ],
+  pdf.legalTitle({
+    title: 'Instrumento Particular de Locação de Equipamento Móvel',
+    subtitle: data.financial.purchaseOption ? 'Com opção de compra' : undefined,
+    introduction: `Contrato nº ${data.contractNumber}, emitido em ${formatDate(data.issuedAt)}. Pelo presente instrumento particular, de um lado o LOCADOR e, de outro, o LOCATÁRIO, abaixo qualificados.`,
   });
 
-  pdf.section('Qualificação das partes');
-  pdf.keyValues([
-    ['Locador', data.lessor.name],
-    ['CPF/CNPJ do locador', data.lessor.taxId ?? 'Não informado'],
-    ['Endereço do locador', data.lessor.address ?? 'Não informado'],
-    ['Contato do locador', [data.lessor.phone, data.lessor.email].filter(Boolean).join(' | ')],
-    ['Locatario', data.lessee.name],
-    ['CPF do locatario', data.lessee.taxId ?? 'Nao informado'],
-    ['RG / nascimento', [data.lessee.rg, formatDate(data.lessee.birthDate)].filter(Boolean).join(' | ')],
-    ['Contato do locatario', [data.lessee.phone, data.lessee.secondaryPhone, data.lessee.email].filter(Boolean).join(' | ')],
-    ['Endereço do locatário', data.lessee.address ?? 'Não informado'],
-    ['Trabalho / referência', [data.lessee.workAddress, data.lessee.reference].filter(Boolean).join(' | ')],
+  pdf.legalSubheading('LOCADOR');
+  pdf.legalGrid([
+    [['Nome / razão social', data.lessor.name], ['CPF / CNPJ', data.lessor.taxId ?? 'Não informado']],
+    [['Endereço', data.lessor.address ?? 'Não informado']],
+    [['Telefone', data.lessor.phone ?? 'Não informado'], ['E-mail', data.lessor.email ?? 'Não informado']],
   ]);
 
-  pdf.section('Quadro técnico do aparelho');
-  pdf.keyValues([
-    ['Modelo', data.device.model],
-    ['Capacidade e cor', `${data.device.capacityGb} GB | ${data.device.color}`],
-    ['IMEI 1', data.device.imei1],
-    ['IMEI 2', data.device.imei2 ?? 'Não informado'],
-    ['Número de série', data.device.serialNumber],
-    ['Bateria e condição', `${data.device.batteryHealth}% | ${data.device.condition}`],
-    ['Valor de indenização', formatCurrency(data.device.indemnityValue)],
-    ['Apple Business / MDM', data.device.mdmStatus],
-    ['Acessórios', data.device.accessories.join(', ') || 'Nenhum informado'],
-    ['Observações', data.device.notes ?? 'Nenhuma'],
+  pdf.legalSubheading('LOCATÁRIO');
+  pdf.legalGrid([
+    [['Nome completo', data.lessee.name]],
+    [['Estado civil', 'Não informado'], ['Profissão', 'Não informado']],
+    [['RG', data.lessee.rg ?? 'Não informado'], ['CPF / MF', data.lessee.taxId ?? 'Não informado']],
+    [['Data de nascimento', formatDate(data.lessee.birthDate)], ['Telefone', data.lessee.phone ?? 'Não informado']],
+    [['Endereço residencial', data.lessee.address ?? 'Não informado']],
+    [['Endereço comercial', data.lessee.workAddress ?? 'Não informado']],
+    [['E-mail', data.lessee.email ?? 'Não informado'], ['Referência', data.lessee.reference ?? 'Não informado']],
   ]);
-
-  pdf.section('Resumo financeiro');
-  pdf.keyValues([
-    ['Caução paga no ato', formatCurrency(data.financial.depositAmount)],
-    ['Mensalidade', formatCurrency(data.financial.monthlyAmount)],
-    ['Quantidade de mensalidades', String(data.financial.installmentCount)],
-    ['Total das mensalidades', formatCurrency(data.financial.monthlyTotal)],
-    ['Valor total do contrato', formatCurrency(data.financial.totalContract)],
-    ['Valor já recebido', formatCurrency(data.financial.amountReceived)],
-    ['Saldo restante', formatCurrency(data.financial.remainingBalance)],
-    ['Multa e juros', `${data.financial.lateFeePercent}% | ${data.financial.dailyInterestPercent}% ao dia`],
-  ]);
-
-  pdf.section('Mensalidades');
-  pdf.table(
-    ['Parcela', 'Vencimento', 'Valor', 'Status', 'Pagamento'],
-    data.installments.map((item) => [
-      String(item.number), formatDate(item.dueDate), formatCurrency(item.amount), formatInstallmentStatus(item.status),
-      item.paidAt ? formatDate(item.paidAt) : 'Pendente',
-    ]),
-    [0.7, 1.25, 1.2, 1, 1.25],
-  );
 
   buildContractSections(data).forEach((section) => {
-    pdf.section(section.title);
-    section.paragraphs.forEach((paragraph) => pdf.paragraph(paragraph));
+    pdf.legalSection(section.title);
+    section.paragraphs.forEach((paragraph) => pdf.legalParagraph(paragraph));
+
+    if (section.title === 'CAPÍTULO II - DO OBJETO') {
+      pdf.legalSubheading('EQUIPAMENTO');
+      pdf.legalGrid([
+        [['Modelo', data.device.model], ['Cor', data.device.color]],
+        [['Estado de conservação', data.device.condition], ['Capacidade', `${data.device.capacityGb} GB`]],
+        [['Valor aproximado / indenização', formatCurrency(data.device.indemnityValue)], ['Saúde da bateria', `${data.device.batteryHealth}%`]],
+        [['IMEI 1', data.device.imei1], ['IMEI 2', data.device.imei2 ?? 'Não informado']],
+        [['Número de série', data.device.serialNumber], ['Apple Business / MDM', data.device.mdmStatus]],
+        [['Acessórios', data.device.accessories.join(', ') || 'Nenhum informado']],
+        [['Observações', data.device.notes ?? 'Nenhuma']],
+      ]);
+    }
+
+    if (section.title === 'CAPÍTULO V - DO PREÇO E DA FORMA DE PAGAMENTO') {
+      const summaryRows: Array<Array<[string, string]>> = [
+        [['Caução paga no ato', formatCurrency(data.financial.depositAmount)], ['Mensalidade', formatCurrency(data.financial.monthlyAmount)]],
+        [['Quantidade de mensalidades', String(data.financial.installmentCount)], ['Total das mensalidades', formatCurrency(data.financial.monthlyTotal)]],
+        [['Valor total do contrato', formatCurrency(data.financial.totalContract)], ['Valor já recebido', formatCurrency(data.financial.amountReceived)]],
+        [['Saldo restante', formatCurrency(data.financial.remainingBalance)], ['Forma de pagamento da caução', paymentMethodLabel(data.financial.depositPaymentMethod)]],
+        [['Data de pagamento da caução', formatDate(data.financial.depositPaidAt)], ['Vigência', `${formatDate(data.startDate)} a ${formatDate(data.endDate)}`]],
+      ];
+      if (data.financial.purchaseOption) {
+        summaryRows.push([['Valor da opção de compra', formatCurrency(data.financial.purchaseOptionAmount ?? 0)]]);
+      }
+      pdf.legalSubheading('QUADRO RESUMO');
+      pdf.legalGrid(summaryRows);
+      pdf.legalSubheading('MENSALIDADES');
+      pdf.legalDataTable(
+        ['Parcela', 'Vencimento', 'Valor', 'Status', 'Pagamento'],
+        data.installments.map((item) => [
+          String(item.number),
+          formatDate(item.dueDate),
+          formatCurrency(item.amount),
+          formatInstallmentStatus(item.status),
+          item.paidAt ? formatDate(item.paidAt) : 'Pendente',
+        ]),
+        [0.65, 1.2, 1.15, 1, 1.2],
+      );
+    }
   });
 
-  pdf.section('Checklist de entrega');
-  const checklistLabels: Record<string, string> = {
-    screen: 'Tela', face_id: 'Face ID', cameras: 'Câmeras', microphones: 'Microfones',
-    speakers: 'Alto-falantes', buttons: 'Botões', connectors: 'Conectores', housing: 'Carcaça',
-    battery: 'Bateria', wifi: 'Wi-Fi', bluetooth: 'Bluetooth', mobile_data: 'Dados móveis',
-    cable: 'Cabo', charger: 'Carregador', box: 'Caixa', case: 'Capinha', screen_protector: 'Película',
-  };
-  const checklistRows = Object.entries(data.checklist)
-    .filter(([key]) => key !== 'notes')
-    .map(([key, value]) => [checklistLabels[key] ?? key.replaceAll('_', ' '), value === true ? 'Conferido' : 'Não conferido'] as [string, string]);
-  pdf.keyValues(checklistRows, 2);
-  pdf.paragraph(`Observações do checklist: ${String(data.checklist.notes || 'Nenhuma')}`);
-
-  pdf.section('Fotos do aparelho');
-  await pdf.photos(data.photos);
-
-  pdf.signatures({ lessor: data.lessor.name, lessee: data.lessee.name, venue: data.venue });
+  pdf.legalSignatures({
+    lessor: data.lessor.name,
+    lessee: data.lessee.name,
+    venue: data.venue || '________________',
+  });
   return pdf.save({
     title: `Contrato ${data.contractNumber}`,
     contractNumber: data.contractNumber,
     clientName: data.lessee.name,
+  }, {
+    style: 'legal',
+    author: data.lessor.name,
   });
 }

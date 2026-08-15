@@ -31,6 +31,8 @@ type ContractRow = {
   monthly_amount: number | string;
   deposit_amount: number | string;
   deposit_as_first_installment: boolean;
+  deposit_paid_at: string | null;
+  deposit_payment_method: string | null;
   late_fee_percent: number | string;
   daily_interest_percent: number | string;
   indemnity_value: number | string | null;
@@ -206,6 +208,8 @@ async function assemblePdfData(admin: SupabaseClient, contractId: string, profil
   const financial = calculateFinancialSummary({
     depositAmount: money(contract.deposit_amount),
     depositAsFirstInstallment: Boolean(contract.deposit_as_first_installment),
+    depositPaidAt: contract.deposit_paid_at,
+    depositPaymentMethod: contract.deposit_payment_method,
     monthlyAmount: money(contract.monthly_amount),
     installmentCount: Number(contract.term_months),
     installments,

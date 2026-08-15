@@ -91,9 +91,24 @@ describe('conteudo contratual', () => {
   });
 
   it('inclui a clausula de compra somente quando ativada', () => {
-    expect(buildContractSections(baseData).some((section) => section.title.includes('opção de compra'))).toBe(false);
+    const disabledText = buildContractSections(baseData).flatMap((section) => section.paragraphs).join(' ');
+    expect(disabledText).not.toContain('opção de compra');
     const enabled = { ...baseData, financial: { ...baseData.financial, purchaseOption: true, purchaseOptionAmount: 2000 } };
-    expect(buildContractSections(enabled).some((section) => section.title.includes('opção de compra'))).toBe(true);
+    const enabledText = buildContractSections(enabled).flatMap((section) => section.paragraphs).join(' ');
+    expect(enabledText).toContain('opção de compra');
+    expect(enabledText).toMatch(/R\$\s*2\.000,00/);
+  });
+
+  it('implementa os 23 capitulos do modelo juridico', () => {
+    const sections = buildContractSections(baseData);
+    expect(sections).toHaveLength(23);
+    expect(sections[0]?.title).toBe('CAPÍTULO I - DAS PARTES');
+    expect(sections[22]?.title).toBe('CAPÍTULO XXIII - DO FORO');
+    const text = sections.flatMap((section) => section.paragraphs).join(' ');
+    expect(text).toContain('Termo de Vistoria');
+    expect(text).toContain('vencimento antecipado');
+    expect(text).toContain('Apple Business / MDM');
+    expect(text).toContain('informações privadas do LOCATÁRIO');
   });
 
   it('nao promete devolucao automatica da caucao', () => {

@@ -37,6 +37,8 @@ export type ContractInstallment = {
 
 export type ContractFinancialSummary = {
   depositAmount: number;
+  depositPaidAt?: string | null;
+  depositPaymentMethod?: string | null;
   monthlyAmount: number;
   installmentCount: number;
   monthlyTotal: number;

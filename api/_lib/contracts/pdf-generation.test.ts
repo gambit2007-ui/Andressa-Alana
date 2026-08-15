@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { generateContractPdf } from './generate-contract-pdf.js';
 import { generateDeliveryTermPdf } from './generate-delivery-term-pdf.js';
@@ -15,7 +16,8 @@ const data: ContractPdfData = {
     indemnityValue: 3500, notes: null, mdmStatus: 'Ativo', accessories: ['Cabo'],
   },
   financial: {
-    depositAmount: 480, monthlyAmount: 480, installmentCount: 4, monthlyTotal: 1920,
+    depositAmount: 480, depositPaidAt: '2026-08-04', depositPaymentMethod: 'pix',
+    monthlyAmount: 480, installmentCount: 4, monthlyTotal: 1920,
     totalContract: 2400, amountReceived: 480, remainingBalance: 1920,
     lateFeePercent: 2, dailyInterestPercent: 1.5, purchaseOption: true, purchaseOptionAmount: 2000,
   },
@@ -33,6 +35,10 @@ describe('geracao real dos PDFs', () => {
     const bytes = await generateContractPdf(data);
     expect(pdfHeader(bytes)).toBe('%PDF');
     expect(bytes.length).toBeGreaterThan(10_000);
+    const document = await PDFDocument.load(bytes);
+    expect(document.getPageCount()).toBe(4);
+    expect(document.getTitle()).toBe(`Contrato ${data.contractNumber}`);
+    expect(document.getAuthor()).toBe(data.lessor.name);
   });
 
   it('gera o termo de entrega separadamente', async () => {

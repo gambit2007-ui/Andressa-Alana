@@ -14,6 +14,8 @@ const GOLD = rgb(0.74, 0.55, 0.22);
 const SLATE = rgb(0.28, 0.34, 0.43);
 const LIGHT = rgb(0.95, 0.96, 0.97);
 const WHITE = rgb(1, 1, 1);
+const INK = rgb(0.08, 0.09, 0.11);
+const LINE = rgb(0.72, 0.75, 0.79);
 
 export class ContractPdfWriter {
   readonly document: PDFDocument;
@@ -70,6 +72,151 @@ export class ContractPdfWriter {
       detailY -= 20;
     });
     this.addPage();
+  }
+
+  legalTitle(input: { title: string; subtitle?: string; introduction: string }): void {
+    const titleLines = this.wrap(input.title.toUpperCase(), this.contentWidth, 12, this.bold);
+    titleLines.forEach((line) => {
+      const x = this.margin + (this.contentWidth - this.bold.widthOfTextAtSize(line, 12)) / 2;
+      this.page.drawText(line, { x, y: this.y, size: 12, font: this.bold, color: INK });
+      this.y -= 16;
+    });
+    if (input.subtitle) {
+      const subtitle = sanitizePdfText(input.subtitle);
+      const x = this.margin + (this.contentWidth - this.bold.widthOfTextAtSize(subtitle, 9.5)) / 2;
+      this.page.drawText(subtitle, { x, y: this.y - 1, size: 9.5, font: this.bold, color: INK });
+      this.y -= 17;
+    }
+    this.page.drawLine({
+      start: { x: this.margin, y: this.y },
+      end: { x: this.margin + this.contentWidth, y: this.y },
+      thickness: 1.2,
+      color: NAVY,
+    });
+    this.y -= 16;
+    this.legalParagraph(input.introduction);
+  }
+
+  legalSection(title: string): void {
+    this.ensureSpace(34);
+    this.y -= 3;
+    const lines = this.wrap(title.toUpperCase(), this.contentWidth, 8.4, this.bold);
+    lines.forEach((line) => {
+      this.page.drawText(line, { x: this.margin, y: this.y, size: 8.4, font: this.bold, color: INK });
+      this.y -= 10.5;
+    });
+    this.y -= 2;
+  }
+
+  legalSubheading(title: string): void {
+    this.ensureSpace(24);
+    this.page.drawText(sanitizePdfText(title).toUpperCase(), {
+      x: this.margin,
+      y: this.y,
+      size: 7.4,
+      font: this.bold,
+      color: INK,
+    });
+    this.y -= 11;
+  }
+
+  legalParagraph(text: string): void {
+    const lines = this.wrap(text, this.contentWidth, 7.65, this.regular);
+    const height = lines.length * 9.35 + 3;
+    this.ensureSpace(height);
+    lines.forEach((line) => {
+      this.page.drawText(line, { x: this.margin, y: this.y, size: 7.65, font: this.regular, color: INK });
+      this.y -= 9.35;
+    });
+    this.y -= 3;
+  }
+
+  legalGrid(rows: Array<Array<[string, string]>>): void {
+    rows.forEach((row) => {
+      const columnWidth = this.contentWidth / row.length;
+      const valueLines = row.map(([, value]) => this.wrap(value, columnWidth - 12, 7.4, this.regular).slice(0, 3));
+      const height = Math.max(27, 15 + Math.max(...valueLines.map((lines) => lines.length)) * 8.8);
+      this.ensureSpace(height + 1);
+      row.forEach(([label], column) => {
+        const x = this.margin + column * columnWidth;
+        this.page.drawRectangle({
+          x,
+          y: this.y - height,
+          width: columnWidth,
+          height,
+          borderColor: LINE,
+          borderWidth: 0.45,
+        });
+        this.page.drawText(sanitizePdfText(label).toUpperCase(), {
+          x: x + 6,
+          y: this.y - 9,
+          size: 5.8,
+          font: this.bold,
+          color: SLATE,
+        });
+        (valueLines[column] ?? []).forEach((line, lineIndex) => {
+          this.page.drawText(line, {
+            x: x + 6,
+            y: this.y - 20 - lineIndex * 8.8,
+            size: 7.4,
+            font: this.regular,
+            color: INK,
+          });
+        });
+      });
+      this.y -= height;
+    });
+    this.y -= 7;
+  }
+
+  legalDataTable(headers: string[], rows: string[][], widths: number[]): void {
+    const total = widths.reduce((sum, value) => sum + value, 0);
+    const normalized = widths.map((value) => (value / total) * this.contentWidth);
+    const drawHeader = () => {
+      this.page.drawRectangle({ x: this.margin, y: this.y - 15, width: this.contentWidth, height: 20, color: NAVY });
+      let x = this.margin;
+      headers.forEach((header, index) => {
+        this.page.drawText(this.truncate(header.toUpperCase(), (normalized[index] ?? 0) - 8, 5.7, this.bold), {
+          x: x + 4,
+          y: this.y - 7,
+          size: 5.7,
+          font: this.bold,
+          color: WHITE,
+        });
+        x += normalized[index] ?? 0;
+      });
+      this.y -= 20;
+    };
+    this.ensureSpace(44);
+    drawHeader();
+    rows.forEach((row, rowIndex) => {
+      if (this.y - 18 < 58) {
+        this.addPage();
+        drawHeader();
+      }
+      this.page.drawRectangle({
+        x: this.margin,
+        y: this.y - 13,
+        width: this.contentWidth,
+        height: 18,
+        color: rowIndex % 2 ? WHITE : LIGHT,
+        borderColor: LINE,
+        borderWidth: 0.25,
+      });
+      let x = this.margin;
+      row.forEach((cell, index) => {
+        this.page.drawText(this.truncate(cell, (normalized[index] ?? 0) - 8, 6.4, this.regular), {
+          x: x + 4,
+          y: this.y - 6,
+          size: 6.4,
+          font: this.regular,
+          color: INK,
+        });
+        x += normalized[index] ?? 0;
+      });
+      this.y -= 18;
+    });
+    this.y -= 7;
   }
 
   section(title: string): void {
@@ -194,15 +341,47 @@ export class ContractPdfWriter {
     this.page.drawText('Data: ____/____/________', { x: this.margin, y: 74, size: 9, font: this.regular, color: SLATE });
   }
 
-  async save(metadata: { title: string; contractNumber: string; clientName: string }): Promise<Uint8Array> {
+  legalSignatures(input: { lessor: string; lessee: string; venue: string | null }): void {
+    this.ensureSpace(190);
+    this.y -= 5;
+    this.page.drawText(`${sanitizePdfText(input.venue)}, ____/____/________.`, {
+      x: this.margin,
+      y: this.y,
+      size: 8,
+      font: this.regular,
+      color: INK,
+    });
+    this.y -= 46;
+    const gap = 28;
+    const width = (this.contentWidth - gap) / 2;
+    const drawPair = (entries: Array<[string, string]>) => {
+      entries.forEach(([role, name], column) => {
+        const x = this.margin + column * (width + gap);
+        this.page.drawLine({ start: { x, y: this.y }, end: { x: x + width, y: this.y }, thickness: 0.55, color: INK });
+        this.page.drawText(this.truncate(name, width, 7.3, this.bold), { x, y: this.y - 12, size: 7.3, font: this.bold, color: INK });
+        this.page.drawText(role, { x, y: this.y - 23, size: 6.3, font: this.regular, color: SLATE });
+      });
+      this.y -= 65;
+    };
+    drawPair([['LOCADOR', input.lessor], ['LOCATÁRIO', input.lessee]]);
+    drawPair([['TESTEMUNHA 1', 'Nome e CPF'], ['TESTEMUNHA 2', 'Nome e CPF']]);
+  }
+
+  async save(
+    metadata: { title: string; contractNumber: string; clientName: string },
+    options: { style?: 'brand' | 'legal'; author?: string } = {},
+  ): Promise<Uint8Array> {
     this.document.setTitle(metadata.title);
     this.document.setSubject(`Contrato ${metadata.contractNumber}`);
-    this.document.setAuthor('Vantage iPhones');
+    this.document.setAuthor(options.author || 'Vantage iPhones');
     const pages = this.document.getPages();
     pages.forEach((page, index) => {
       const { width } = page.getSize();
       page.drawLine({ start: { x: this.margin, y: 42 }, end: { x: width - this.margin, y: 42 }, thickness: 0.5, color: rgb(0.82, 0.84, 0.87) });
-      page.drawText(`VANTAGE IPHONES  |  ${sanitizePdfText(metadata.contractNumber)}  |  ${sanitizePdfText(metadata.clientName)}`, {
+      const footer = options.style === 'legal'
+        ? `${sanitizePdfText(metadata.contractNumber)}  |  ${sanitizePdfText(metadata.clientName)}`
+        : `VANTAGE IPHONES  |  ${sanitizePdfText(metadata.contractNumber)}  |  ${sanitizePdfText(metadata.clientName)}`;
+      page.drawText(footer, {
         x: this.margin, y: 27, size: 6.5, font: this.regular, color: SLATE,
       });
       page.drawText(`Página ${index + 1} de ${pages.length}`, {
