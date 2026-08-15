@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { buildContractSections, formatInstallmentStatus } from './content.js';
 import { formatCurrency, formatDate } from './formatters.js';
 import { ContractPdfWriter } from './pdf-writer.js';
@@ -14,6 +15,11 @@ const paymentMethodLabels: Record<string, string> = {
 const paymentMethodLabel = (method: string | null | undefined): string => (
   method ? paymentMethodLabels[method] ?? method : 'Não informado'
 );
+
+const witnessSignatures = Promise.all([
+  readFile(new URL('./assets/guilherme-geovane-sobral.png', import.meta.url)),
+  readFile(new URL('./assets/robson-leandro-da-silva.png', import.meta.url)),
+]);
 
 export async function generateContractPdf(data: ContractPdfData): Promise<Uint8Array> {
   const pdf = await ContractPdfWriter.create();
@@ -86,10 +92,15 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Uint8A
     }
   });
 
-  pdf.legalSignatures({
+  const [guilhermeSignature, robsonSignature] = await witnessSignatures;
+  await pdf.legalSignatures({
     lessor: data.lessor.name,
     lessee: data.lessee.name,
     venue: data.venue || '________________',
+    witnesses: [
+      { name: 'Guilherme Geovane Sobral', signature: guilhermeSignature },
+      { name: 'Robson Leandro da Silva', signature: robsonSignature },
+    ],
   });
   return pdf.save({
     title: `Contrato ${data.contractNumber}`,

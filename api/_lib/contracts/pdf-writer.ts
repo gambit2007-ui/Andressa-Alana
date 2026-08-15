@@ -341,8 +341,13 @@ export class ContractPdfWriter {
     this.page.drawText('Data: ____/____/________', { x: this.margin, y: 74, size: 9, font: this.regular, color: SLATE });
   }
 
-  legalSignatures(input: { lessor: string; lessee: string; venue: string | null }): void {
-    this.ensureSpace(190);
+  async legalSignatures(input: {
+    lessor: string;
+    lessee: string;
+    venue: string | null;
+    witnesses: Array<{ name: string; signature: Uint8Array }>;
+  }): Promise<void> {
+    this.ensureSpace(225);
     this.y -= 5;
     this.page.drawText(`${sanitizePdfText(input.venue)}, ____/____/________.`, {
       x: this.margin,
@@ -354,17 +359,26 @@ export class ContractPdfWriter {
     this.y -= 46;
     const gap = 28;
     const width = (this.contentWidth - gap) / 2;
-    const drawPair = (entries: Array<[string, string]>) => {
-      entries.forEach(([role, name], column) => {
+    const witnessEntries = await Promise.all(input.witnesses.map(async (witness, index) => ({
+      role: `TESTEMUNHA ${index + 1}`,
+      name: witness.name,
+      image: await this.document.embedPng(witness.signature),
+    })));
+    const drawPair = (entries: Array<{ role: string; name: string; image?: PDFImage }>, spacing: number) => {
+      entries.forEach(({ role, name, image }, column) => {
         const x = this.margin + column * (width + gap);
+        if (image) this.drawImageFit(image, x + 10, this.y + 4, width - 20, 42);
         this.page.drawLine({ start: { x, y: this.y }, end: { x: x + width, y: this.y }, thickness: 0.55, color: INK });
         this.page.drawText(this.truncate(name, width, 7.3, this.bold), { x, y: this.y - 12, size: 7.3, font: this.bold, color: INK });
         this.page.drawText(role, { x, y: this.y - 23, size: 6.3, font: this.regular, color: SLATE });
       });
-      this.y -= 65;
+      this.y -= spacing;
     };
-    drawPair([['LOCADOR', input.lessor], ['LOCATÁRIO', input.lessee]]);
-    drawPair([['TESTEMUNHA 1', 'Nome e CPF'], ['TESTEMUNHA 2', 'Nome e CPF']]);
+    drawPair([
+      { role: 'LOCADOR', name: input.lessor },
+      { role: 'LOCATÁRIO', name: input.lessee },
+    ], 92);
+    drawPair(witnessEntries, 65);
   }
 
   async save(
