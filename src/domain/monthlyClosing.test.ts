@@ -47,6 +47,22 @@ describe('fechamento mensal de caixa', () => {
     expect(closings[1]).toMatchObject({ month: '2026-08', openingBalance: 4200, netMovement: 400, closingBalance: 4600 });
   });
 
+  it('separa uma correcao legada da entrada de compra das despesas operacionais', () => {
+    const [closing] = buildMonthlyCashClosings([
+      transaction('2026-08-01', 'in', 'deposit_received', 900),
+      transaction('2026-08-20', 'out', 'deposit_refund', 900),
+    ], [], '2026-08');
+
+    expect(closing).toMatchObject({
+      depositIncome: 900,
+      depositRefunds: 900,
+      extraExpenses: 0,
+      totalEntries: 900,
+      totalOutflows: 900,
+      closingBalance: 0,
+    });
+  });
+
   it('desconta compras patrimoniais sem lancamento duplicado no caixa', () => {
     const [closing] = buildMonthlyCashClosings([
       transaction('2026-08-01', 'in', 'other_income', 1000, 'reversed'),

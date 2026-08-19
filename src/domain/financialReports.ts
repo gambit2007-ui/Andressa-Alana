@@ -47,11 +47,11 @@ export async function createAnnualFinancialReport(summary: ProfessionalFinanceSu
   addReportHeader(page, bold, regular, `Relatorio financeiro ${summary.selectedYear}`, 'Caixa, resultado operacional e desempenho mensal');
 
   drawMetric(page, bold, regular, 40, 680, 'Caixa atual', formatCurrency(summary.currentCash), summary.currentCash >= 0 ? green : red);
-  drawMetric(page, bold, regular, 217, 680, 'Receita operacional', formatCurrency(summary.annualRevenue), green);
+  drawMetric(page, bold, regular, 217, 680, 'Receita operacional', formatCurrency(summary.annualRevenue), summary.annualRevenue >= 0 ? green : red);
   drawMetric(page, bold, regular, 394, 680, 'Resultado operacional', formatCurrency(summary.annualOperatingResult), summary.annualOperatingResult >= 0 ? green : red);
   drawMetric(page, bold, regular, 40, 610, 'Contas a receber', formatCurrency(summary.accountsReceivable), gold);
-  drawMetric(page, bold, regular, 217, 610, 'Capital em locacao', formatCurrency(summary.capitalInRentedFleet));
-  drawMetric(page, bold, regular, 394, 610, 'ROI anual', `${summary.annualRoi.toFixed(2)}%`, summary.annualRoi >= 0 ? green : red);
+  drawMetric(page, bold, regular, 217, 610, 'Entradas de compra', formatCurrency(summary.annualPurchaseEntries));
+  drawMetric(page, bold, regular, 394, 610, 'Valores em atraso', formatCurrency(summary.overdueReceivables), summary.overdueReceivables > 0 ? red : green);
 
   page.drawText('DESEMPENHO MENSAL', { x: 40, y: 570, size: 8, font: bold, color: gold });
   const headers = ['Mes', 'Entradas', 'Saidas', 'Resultado caixa', 'Resultado operacional'];
@@ -86,7 +86,7 @@ export async function createAnnualFinancialReport(summary: ProfessionalFinanceSu
     page.drawLine({ start: { x: 40, y: y - 9 }, end: { x: 555, y: y - 9 }, thickness: 0.4, color: rgb(0.9, 0.91, 0.93) });
   });
 
-  page.drawText('Aportes e compras de estoque afetam o caixa, mas nao o resultado operacional.', { x: 40, y: 100, size: 7.5, font: regular, color: slate });
+  page.drawText('Entradas de compra integram a receita e o resultado. Aportes e compras de estoque sao movimentos patrimoniais.', { x: 40, y: 100, size: 7.5, font: regular, color: slate });
   page.drawText(`Gerado em ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}`, { x: 40, y: 78, size: 7, font: regular, color: slate });
   const bytes = await pdf.save();
   return new Blob([bytes], { type: 'application/pdf' });
@@ -112,7 +112,8 @@ export async function createMonthlyFinancialReport(month: ProfessionalMonthMetri
   page.drawText('COMPOSICAO DO MES', { x: 40, y: 570, size: 8, font: bold, color: gold });
   const rows: Array<[string, number, 'in' | 'out' | 'neutral']> = [
     ['Recebimentos de locacao', month.rentalIncome, 'in'],
-    ['Caucoes recebidas', month.depositIncome, 'in'],
+    ['Entradas para compra futura', month.depositIncome, 'in'],
+    ['Correcoes de entrada de compra', month.depositRefunds, 'out'],
     ['Vendas diretas', month.salesIncome, 'in'],
     ['Custo contabil dos aparelhos vendidos', month.salesCost, 'neutral'],
     ['Compras de estoque', month.inventoryPurchases, 'neutral'],
@@ -127,9 +128,9 @@ export async function createMonthlyFinancialReport(month: ProfessionalMonthMetri
     page.drawText(formatCurrency(value), { x: 385, y, size: 9, font: bold, color: direction === 'in' ? green : direction === 'out' ? red : navy });
     page.drawLine({ start: { x: 40, y: y - 10 }, end: { x: 555, y: y - 10 }, thickness: 0.4, color: rgb(0.9, 0.91, 0.93) });
   });
-  page.drawText('O custo contabil dos vendidos compoe a margem e nao representa nova saida de caixa.', { x: 40, y: 165, size: 7.5, font: regular, color: slate });
-  page.drawText(`Situacao: ${month.closingStatus === 'closed' ? 'Fechado' : month.closingStatus === 'reopened' ? 'Reaberto' : 'Em aberto'}`, { x: 40, y: 145, size: 8, font: bold, color: month.closingStatus === 'closed' ? green : gold });
-  page.drawText(`Gerado em ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}`, { x: 40, y: 115, size: 7, font: regular, color: slate });
+  page.drawText('Caucoes ficam fora do lucro. O custo dos vendidos compoe a margem sem criar nova saida.', { x: 40, y: 150, size: 7.5, font: regular, color: slate });
+  page.drawText(`Situacao: ${month.closingStatus === 'closed' ? 'Fechado' : month.closingStatus === 'reopened' ? 'Reaberto' : 'Em aberto'}`, { x: 40, y: 130, size: 8, font: bold, color: month.closingStatus === 'closed' ? green : gold });
+  page.drawText(`Gerado em ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}`, { x: 40, y: 100, size: 7, font: regular, color: slate });
   const bytes = await pdf.save();
   return new Blob([bytes], { type: 'application/pdf' });
 }

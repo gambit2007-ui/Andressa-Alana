@@ -13,12 +13,11 @@ import {
   ReceiptText,
   RotateCcw,
   Scale,
-  Smartphone,
   TrendingUp,
   WalletCards,
 } from 'lucide-react';
 import type { ProfessionalFinanceSummary, ProfessionalMonthMetrics } from '../../domain/professionalFinance';
-import { formatCurrency, formatMonthLabel, formatPercentage } from '../../utils/formatters';
+import { formatCurrency, formatMonthLabel } from '../../utils/formatters';
 
 type FinancialExecutivePanelProps = {
   summary: ProfessionalFinanceSummary;
@@ -89,21 +88,18 @@ export function FinancialExecutivePanel({
     || (summary.selectedYear === currentYear && Number(month.month.slice(5, 7)) <= currentMonthNumber)
   ));
   const selected = summary.months.find((month) => month.month === selectedMonth) ?? visibleMonths[visibleMonths.length - 1];
-  const monthRoi = summary.capitalInRentedFleet > 0 && selected
-    ? (selected.operationalResult / summary.capitalInRentedFleet) * 100
-    : 0;
-  const canCloseSelected = Boolean(selected && selected.month <= currentMonth);
+  const canCloseSelected = Boolean(selected && selected.month < currentMonth);
 
   return (
     <div className="space-y-6">
       <section className="finance-hero">
         <div className="relative z-10 max-w-2xl">
-          <p className="finance-kicker">Saldo consolidado em caixa</p>
+          <p className="finance-kicker">Caixa total consolidado</p>
           <p className={`mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl ${summary.currentCash >= 0 ? 'text-gold-200' : 'text-red-300'}`}>{formatCurrency(summary.currentCash)}</p>
           <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] font-extrabold uppercase tracking-[0.16em]">
             <span className="inline-flex items-center gap-2 text-emerald-300"><Activity className="h-3.5 w-3.5" />Operacao ativa</span>
             <span className="h-1 w-1 rounded-full bg-white/30" />
-            <span className="text-slate-300">Receita operacional {summary.selectedYear}: {formatCurrency(summary.annualRevenue)}</span>
+            <span className="text-slate-300">Entradas de compra no ano: {formatCurrency(summary.annualPurchaseEntries)}</span>
           </div>
         </div>
         <div className="relative z-10 flex w-full flex-col gap-3 lg:w-auto lg:min-w-[350px]">
@@ -122,12 +118,12 @@ export function FinancialExecutivePanel({
       <div className="finance-metrics-scroll">
         {[
           { label: 'Contas a receber', value: summary.accountsReceivable, icon: WalletCards, accent: 'finance-metric-card-receivable', detail: `${formatCurrency(summary.overdueReceivables)} em atraso` },
-          { label: 'Capital em locacao', value: summary.capitalInRentedFleet, icon: Smartphone, accent: 'finance-metric-card-fleet', detail: 'Custo da frota alugada' },
+          { label: 'Receita operacional', value: summary.annualRevenue, icon: CircleDollarSign, accent: 'finance-metric-card-sales', detail: 'Locacoes, entradas de compra, vendas e outras receitas' },
+          { label: 'Resultado operacional', value: summary.annualOperatingResult, icon: TrendingUp, accent: 'finance-metric-card-result', detail: 'Lucro real antes de aportes e estoque' },
+          { label: 'Entradas de compra', value: summary.annualPurchaseEntries, icon: Scale, accent: 'finance-metric-card-deposits', detail: 'Valor nao reembolsavel para a compra futura' },
           { label: 'Compras no ano', value: summary.annualInventoryPurchases, icon: PackageCheck, accent: 'finance-metric-card-purchases', detail: 'Investimento em estoque' },
-          { label: 'Vendas diretas', value: summary.annualSalesRevenue, icon: CircleDollarSign, accent: 'finance-metric-card-sales', detail: `Margem ${formatCurrency(summary.annualSalesMargin)}` },
           { label: 'Aportes', value: summary.annualContributions, icon: ArrowDownToLine, accent: 'finance-metric-card-contributions', detail: 'Fora do faturamento' },
           { label: 'Despesas operacionais', value: summary.annualOperatingExpenses, icon: ReceiptText, accent: 'finance-metric-card-expenses', detail: 'Fretes, taxas e operacao' },
-          { label: 'Retiradas', value: summary.annualWithdrawals, icon: ArrowUpFromLine, accent: 'finance-metric-card-withdrawals', detail: 'Fora do resultado operacional' },
         ].map((metric) => (
           <article key={metric.label} className={`finance-metric-card ${metric.accent}`}>
             <div className="finance-metric-icon"><metric.icon className="h-4 w-4" /></div>
@@ -137,28 +133,6 @@ export function FinancialExecutivePanel({
           </article>
         ))}
       </div>
-
-      <details className="finance-drawer">
-        <summary className="finance-drawer-summary">
-          <div className="finance-drawer-title">
-            <span className="finance-drawer-icon finance-drawer-icon-gold"><TrendingUp className="h-5 w-5" /></span>
-            <span><small>Indicadores executivos</small><strong>Rentabilidade</strong></span>
-          </div>
-          <div className="finance-drawer-preview">
-            <span>Media mensal <strong>{formatCurrency(summary.averageMonthlyOperatingResult)}</strong></span>
-            <span>ROI anual <strong>{formatPercentage(summary.annualRoi)}</strong></span>
-          </div>
-          <ChevronDown className="finance-drawer-chevron" />
-        </summary>
-        <div className="finance-drawer-content">
-          <section className="finance-profit-strip">
-            <div><p className="finance-kicker text-gold-500">Resumo de rentabilidade</p><p className="mt-1 text-xs text-slate-500">Indicadores operacionais sem misturar aportes ou compras de estoque</p></div>
-            <div className="finance-profit-stat"><span>Media mensal</span><strong>{formatCurrency(summary.averageMonthlyOperatingResult)}</strong></div>
-            <div className="finance-profit-stat border-emerald-200"><span>Melhor resultado</span><strong className="text-emerald-700">{formatCurrency(summary.recordOperatingResult)}</strong><small>{summary.recordMonth ? formatMonthLabel(summary.recordMonth) : '-'}</small></div>
-            <div className="finance-profit-stat border-blue-200"><span>ROI anual</span><strong className={summary.annualRoi >= 0 ? 'text-blue-700' : 'text-red-700'}>{formatPercentage(summary.annualRoi)}</strong></div>
-          </section>
-        </div>
-      </details>
 
       <details className="finance-drawer">
         <summary className="finance-drawer-summary">
@@ -212,23 +186,23 @@ export function FinancialExecutivePanel({
                     <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_1fr_1.15fr]">
                       <article className="finance-breakdown finance-breakdown-in">
                         <h3><ArrowDownToLine className="h-4 w-4" />Composicao das entradas</h3>
-                        {[['Locacoes', month.rentalIncome], ['Caucoes', month.depositIncome], ['Vendas diretas', month.salesIncome], ['Aportes', month.capitalAdded], ['Outras entradas', month.otherIncome]].map(([label, value]) => <p key={String(label)}><span>{label}</span><strong>{formatCurrency(Number(value))}</strong></p>)}
+                        {[['Locacoes', month.rentalIncome], ['Entradas de compra', month.depositIncome], ['Vendas diretas', month.salesIncome], ['Aportes', month.capitalAdded], ['Outras entradas', month.otherIncome]].map(([label, value]) => <p key={String(label)}><span>{label}</span><strong>{formatCurrency(Number(value))}</strong></p>)}
                       </article>
                       <article className="finance-breakdown finance-breakdown-out">
                         <h3><ArrowUpFromLine className="h-4 w-4" />Composicao das saidas</h3>
-                        {[['Compras de estoque', month.inventoryPurchases], ['Despesas operacionais', month.operatingExpenses], ['Estornos', month.reversals], ['Retiradas', month.ownerWithdrawals]].map(([label, value]) => <p key={String(label)}><span>{label}</span><strong>{formatCurrency(Number(value))}</strong></p>)}
+                        {[['Compras de estoque', month.inventoryPurchases], ['Despesas operacionais', month.operatingExpenses], ['Correcoes de entrada de compra', month.depositRefunds], ['Estornos', month.reversals], ['Retiradas', month.ownerWithdrawals]].map(([label, value]) => <p key={String(label)}><span>{label}</span><strong>{formatCurrency(Number(value))}</strong></p>)}
                       </article>
                       <CashFlowChart month={month} />
                     </div>
 
                     <div className="mt-5 grid gap-3 sm:grid-cols-3">
                       <div className="finance-result-card"><TrendingUp className="h-4 w-4 text-gold-600" /><span>Resultado operacional</span><strong className={month.operationalResult >= 0 ? 'text-emerald-700' : 'text-red-700'}>{formatCurrency(month.operationalResult)}</strong></div>
-                      <div className="finance-result-card"><Scale className="h-4 w-4 text-blue-700" /><span>ROI da frota no mes</span><strong>{formatPercentage(monthRoi)}</strong></div>
+                      <div className="finance-result-card"><Scale className="h-4 w-4 text-blue-700" /><span>Resultado de caixa</span><strong className={month.netCashFlow >= 0 ? 'text-blue-700' : 'text-red-700'}>{formatCurrency(month.netCashFlow)}</strong></div>
                       <div className="finance-result-card"><CircleDollarSign className="h-4 w-4 text-slate-700" /><span>Margem nas vendas</span><strong>{formatCurrency(month.salesMargin)}</strong></div>
                     </div>
                     <div className="mt-3 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs leading-5 text-blue-950">
                       <CircleDollarSign className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
-                      <p><strong>Resultado operacional e o lucro gerado pela operacao no mes:</strong> locacoes, caucoes, margem das vendas e outras receitas, menos despesas operacionais e estornos. Aportes, retiradas e compras de estoque nao alteram este indicador.</p>
+                      <p><strong>Resultado operacional e o lucro gerado no mes:</strong> locacoes, entradas de compra, margem das vendas e outras receitas, menos despesas, correcoes e estornos. A entrada de compra e receita contratual nao reembolsavel e tambem recupera o investimento do aparelho.</p>
                     </div>
                   </div>
                 )}

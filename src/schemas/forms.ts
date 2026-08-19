@@ -89,10 +89,11 @@ export const contractSchema = z.object({
   client_id: requiredText('Cliente'),
   device_id: requiredText('Aparelho'),
   start_date: requiredText('Data inicial'),
-  first_installment_date: requiredText('Data da primeira mensalidade'),
+  first_installment_date: requiredText('Data da primeira cobranca'),
+  payment_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly']),
   due_day: z.number().int().min(1).max(31),
   term_months: z.number().int().min(1).max(60),
-  monthly_amount: z.number().positive('A mensalidade deve ser maior que zero.'),
+  monthly_amount: z.number().positive('O valor da cobranca deve ser maior que zero.'),
   deposit_amount: money,
   deposit_paid_at: z.string(),
   deposit_payment_method: z.enum(['', 'pix', 'card', 'transfer', 'cash', 'other']),
@@ -104,13 +105,13 @@ export const contractSchema = z.object({
   delivery_checklist: deliveryChecklistSchema,
 }).superRefine((values, context) => {
   if (values.first_installment_date < values.start_date) {
-    context.addIssue({ code: 'custom', path: ['first_installment_date'], message: 'A primeira mensalidade nao pode vencer antes do inicio.' });
+    context.addIssue({ code: 'custom', path: ['first_installment_date'], message: 'A primeira cobranca nao pode vencer antes do inicio.' });
   }
   if (values.deposit_amount > 0 && !values.deposit_paid_at) {
-    context.addIssue({ code: 'custom', path: ['deposit_paid_at'], message: 'Informe quando a caucao foi paga.' });
+    context.addIssue({ code: 'custom', path: ['deposit_paid_at'], message: 'Informe quando a entrada de compra foi paga.' });
   }
   if (values.deposit_amount > 0 && !values.deposit_payment_method) {
-    context.addIssue({ code: 'custom', path: ['deposit_payment_method'], message: 'Informe a forma de pagamento da caucao.' });
+    context.addIssue({ code: 'custom', path: ['deposit_payment_method'], message: 'Informe a forma de pagamento da entrada de compra.' });
   }
   if (values.purchase_option && values.purchase_option_amount <= 0) {
     context.addIssue({ code: 'custom', path: ['purchase_option_amount'], message: 'Informe o valor da opcao de compra.' });

@@ -4,18 +4,31 @@ type NumericValue = number | string | null | undefined;
 
 export type FleetMetrics = {
   capitalInvested: number;
-  revenuesReceived: number;
+  rentalRevenue: number;
+  salesRevenue: number;
+  salesCost: number;
+  salesMargin: number;
+  otherRevenue: number;
+  operationalRevenue: number;
+  purchaseEntryRevenue: number;
   operationalExpenses: number;
   operationalProfit: number;
   currentFleetValue: number;
   assetVariation: number;
-  consolidatedResult: number;
+  economicResult: number;
+  capitalRecovered: number;
+  capitalToRecover: number;
   operationalRoi: number;
-  consolidatedRoi: number;
+  economicRoi: number;
 };
 
 export type AssetMetrics = {
-  revenueReceived: number;
+  rentalRevenue: number;
+  saleRevenue: number;
+  saleMargin: number;
+  otherRevenue: number;
+  operationalRevenue: number;
+  purchaseEntryRevenue: number;
   operationalExpenses: number;
   operationalProfit: number;
   operationalRoi: number;
@@ -46,71 +59,128 @@ const nonOperationalOutflowKinds = new Set([
   'withdrawal',
 ]);
 
+const purchaseEntryReversalKinds = new Set([
+  'deposit_refund',
+  'deposit_return',
+  'security_deposit_refund',
+]);
+
 export const isOperationalExpense = (
   transaction: Pick<CashTransaction, 'direction' | 'kind' | 'status'>,
 ): boolean => transaction.status === 'confirmed'
   && transaction.direction === 'out'
   && !nonOperationalOutflowKinds.has(transaction.kind);
 
-export const isReceivedDeposit = (
+export const isReceivedPurchaseEntry = (
   transaction: Pick<CashTransaction, 'direction' | 'kind' | 'status'>,
 ): boolean => transaction.status === 'confirmed'
   && transaction.direction === 'in'
   && transaction.kind === 'deposit_received';
 
+export const isPurchaseEntryReversal = (
+  transaction: Pick<CashTransaction, 'direction' | 'kind' | 'status'>,
+): boolean => transaction.status === 'confirmed'
+  && transaction.direction === 'out'
+  && purchaseEntryReversalKinds.has(transaction.kind);
+
+export const isOperationalIncome = (
+  transaction: Pick<CashTransaction, 'direction' | 'kind' | 'status'>,
+): boolean => transaction.status === 'confirmed'
+  && transaction.direction === 'in'
+  && transaction.kind === 'other_income';
+
 export function calculateFleetMetrics(input: {
   capitalInvested: NumericValue;
-  revenuesReceived: NumericValue;
+  rentalRevenue: NumericValue;
+  salesRevenue: NumericValue;
+  salesCost: NumericValue;
+  otherRevenue?: NumericValue;
+  purchaseEntryRevenue?: NumericValue;
   operationalExpenses: NumericValue;
   currentFleetValue: NumericValue;
 }): FleetMetrics {
   const capitalInvested = toFiniteNumber(input.capitalInvested);
-  const revenuesReceived = toFiniteNumber(input.revenuesReceived);
+  const rentalRevenue = toFiniteNumber(input.rentalRevenue);
+  const salesRevenue = toFiniteNumber(input.salesRevenue);
+  const salesCost = toFiniteNumber(input.salesCost);
+  const salesMargin = salesRevenue - salesCost;
+  const otherRevenue = toFiniteNumber(input.otherRevenue);
+  const purchaseEntryRevenue = toFiniteNumber(input.purchaseEntryRevenue);
+  const operationalRevenue = rentalRevenue + purchaseEntryRevenue + salesRevenue + otherRevenue;
   const operationalExpenses = toFiniteNumber(input.operationalExpenses);
   const currentFleetValue = toFiniteNumber(input.currentFleetValue);
-  const operationalProfit = round(revenuesReceived - operationalExpenses);
-  const assetVariation = round(currentFleetValue - capitalInvested);
-  const consolidatedResult = round(
-    revenuesReceived + currentFleetValue - capitalInvested - operationalExpenses,
+  const operationalProfit = round(
+    rentalRevenue + purchaseEntryRevenue + salesMargin + otherRevenue - operationalExpenses,
   );
+  const assetVariation = round(currentFleetValue - capitalInvested);
+  const economicResult = round(
+    operationalRevenue + currentFleetValue - capitalInvested - operationalExpenses,
+  );
+  const cashGenerated = operationalRevenue - operationalExpenses;
+  const capitalRecovered = round(Math.min(capitalInvested, Math.max(0, cashGenerated)));
+  const capitalToRecover = round(Math.max(0, capitalInvested - cashGenerated));
 
   return {
     capitalInvested: round(capitalInvested),
-    revenuesReceived: round(revenuesReceived),
+    rentalRevenue: round(rentalRevenue),
+    salesRevenue: round(salesRevenue),
+    salesCost: round(salesCost),
+    salesMargin: round(salesMargin),
+    otherRevenue: round(otherRevenue),
+    operationalRevenue: round(operationalRevenue),
+    purchaseEntryRevenue: round(purchaseEntryRevenue),
     operationalExpenses: round(operationalExpenses),
     operationalProfit,
     currentFleetValue: round(currentFleetValue),
     assetVariation,
-    consolidatedResult,
+    economicResult,
+    capitalRecovered,
+    capitalToRecover,
     operationalRoi: capitalInvested > 0 ? round((operationalProfit / capitalInvested) * 100) : 0,
-    consolidatedRoi: capitalInvested > 0 ? round((consolidatedResult / capitalInvested) * 100) : 0,
+    economicRoi: capitalInvested > 0 ? round((economicResult / capitalInvested) * 100) : 0,
   };
 }
 
 export function calculateAssetMetrics(input: {
-  revenueReceived: NumericValue;
+  rentalRevenue: NumericValue;
+  saleRevenue?: NumericValue;
+  otherRevenue?: NumericValue;
+  purchaseEntryRevenue?: NumericValue;
   operationalExpenses: NumericValue;
   purchaseValue: NumericValue;
   currentMarketValue: NumericValue;
   averageMonthlyRevenue: NumericValue;
 }): AssetMetrics {
-  const revenueReceived = toFiniteNumber(input.revenueReceived);
+  const rentalRevenue = toFiniteNumber(input.rentalRevenue);
+  const saleRevenue = toFiniteNumber(input.saleRevenue);
+  const otherRevenue = toFiniteNumber(input.otherRevenue);
+  const purchaseEntryRevenue = toFiniteNumber(input.purchaseEntryRevenue);
   const operationalExpenses = toFiniteNumber(input.operationalExpenses);
   const purchaseValue = toFiniteNumber(input.purchaseValue);
   const currentMarketValue = toFiniteNumber(input.currentMarketValue);
   const averageMonthlyRevenue = toFiniteNumber(input.averageMonthlyRevenue);
-  const operationalProfit = round(revenueReceived - operationalExpenses);
-  const remainingToRecover = round(Math.max(0, purchaseValue - operationalProfit));
+  const saleMargin = saleRevenue > 0 ? saleRevenue - purchaseValue : 0;
+  const operationalRevenue = rentalRevenue + purchaseEntryRevenue + saleRevenue + otherRevenue;
+  const operationalProfit = round(
+    rentalRevenue + purchaseEntryRevenue + saleMargin + otherRevenue - operationalExpenses,
+  );
+  const cashGenerated = operationalRevenue - operationalExpenses;
+  const remainingToRecover = round(Math.max(0, purchaseValue - cashGenerated));
 
   return {
-    revenueReceived: round(revenueReceived),
+    rentalRevenue: round(rentalRevenue),
+    saleRevenue: round(saleRevenue),
+    saleMargin: round(saleMargin),
+    otherRevenue: round(otherRevenue),
+    operationalRevenue: round(operationalRevenue),
+    purchaseEntryRevenue: round(purchaseEntryRevenue),
     operationalExpenses: round(operationalExpenses),
     operationalProfit,
     operationalRoi: purchaseValue > 0 ? round((operationalProfit / purchaseValue) * 100) : 0,
     purchaseValue: round(purchaseValue),
     currentMarketValue: round(currentMarketValue),
     accumulatedDepreciation: round(Math.max(0, purchaseValue - currentMarketValue)),
-    economicResult: round(revenueReceived + currentMarketValue - purchaseValue - operationalExpenses),
+    economicResult: round(operationalRevenue + currentMarketValue - purchaseValue - operationalExpenses),
     remainingToRecover,
     remainingPaybackMonths: averageMonthlyRevenue > 0
       ? round(remainingToRecover / averageMonthlyRevenue)

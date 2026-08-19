@@ -9,7 +9,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../AuthGate';
 import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../components/ui';
-import { calculateContractPlan, dueDateForMonth, generateInstallmentSchedule } from '../../domain/finance';
+import {
+  calculateContractPlan,
+  dueDateForMonth,
+  generateInstallmentSchedule,
+  paymentAmountLabel,
+  paymentFrequencyLabel,
+} from '../../domain/finance';
 import { generateInitialContractDocuments } from '../../domain/contractDocuments';
 import {
   createContract,
@@ -36,6 +42,7 @@ import type {
   ContractStatus,
   DeliveryChecklist,
   DeliveryChecklistKey,
+  PaymentFrequency,
 } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -59,6 +66,7 @@ const emptyChecklist: DeliveryChecklist = {
 const today = new Date().toISOString().slice(0, 10);
 const defaultValues: ContractFormData = {
   client_id: '', device_id: '', start_date: today, first_installment_date: dueDateForMonth(today, 1, 10),
+  payment_frequency: 'monthly',
   due_day: 10, term_months: 12, monthly_amount: 350, deposit_amount: 500,
   deposit_paid_at: today, deposit_payment_method: 'pix', indemnity_value: 0,
   late_fee_percent: 2, daily_interest_percent: 1.5,
@@ -71,6 +79,7 @@ const contractFormValues = (contract: Contract): ContractFormData => ({
   start_date: contract.start_date.slice(0, 10),
   first_installment_date: contract.first_installment_date?.slice(0, 10)
     ?? dueDateForMonth(contract.start_date.slice(0, 10), 1, contract.due_day),
+  payment_frequency: contract.payment_frequency ?? 'monthly',
   due_day: contract.due_day,
   term_months: contract.term_months,
   monthly_amount: contract.monthly_amount,
@@ -120,6 +129,7 @@ export default function ContractsPage() {
     defaultValues: settingsValues(null),
   });
   const watched = form.watch();
+  const selectedFrequency = (watched.payment_frequency || 'monthly') as PaymentFrequency;
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -140,10 +150,11 @@ export default function ContractsPage() {
 
   const preview = useMemo(() => generateInstallmentSchedule({
     firstInstallmentDate: watched.first_installment_date || defaultValues.first_installment_date,
+    paymentFrequency: selectedFrequency,
     dueDay: Number(watched.due_day || 1),
     termMonths: Math.min(Number(watched.term_months || 0), 60),
     monthlyAmount: Number(watched.monthly_amount || 0),
-  }), [watched.first_installment_date, watched.due_day, watched.term_months, watched.monthly_amount]);
+  }), [selectedFrequency, watched.first_installment_date, watched.due_day, watched.term_months, watched.monthly_amount]);
 
   const missingRelatedData = useMemo(() => {
     const client = clientsQuery.data?.find((item) => item.id === watched.client_id);
@@ -167,7 +178,7 @@ export default function ContractsPage() {
         const contractId = await updateContract(contract.id, values, contract.deposit_as_first_installment);
         return { contractId, documentsOk: true, edited: true };
       }
-      setCreationStage('Salvando contrato e mensalidades...');
+      setCreationStage('Salvando contrato e cobrancas...');
       const contractId = await createContract(profile.organization_id, values);
       setCreationStage('Contrato salvo. Gerando documentos...');
       const generation = await generateInitialContractDocuments(contractId, generateContractDocument);
@@ -308,12 +319,12 @@ export default function ContractsPage() {
                   <div className="rounded-2xl bg-slate-950 p-4 text-white"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-cyan-300"><Smartphone className="h-3.5 w-3.5" />Aparelho</p><p className="mt-2 font-bold">{contract.device?.model}</p><p className="mt-1 text-xs text-slate-400">SN {contract.device?.serial_number}</p></div>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 text-xs sm:grid-cols-4">
-                  <div><p className="text-slate-400">Mensalidade</p><p className="mt-1 font-extrabold text-slate-900">{formatCurrency(contract.monthly_amount)}</p></div>
-                  <div><p className="text-slate-400">Caucao separada</p><p className="mt-1 font-extrabold text-slate-900">{formatCurrency(contract.deposit_amount)}</p></div>
+                  <div><p className="text-slate-400">{paymentAmountLabel[contract.payment_frequency]}</p><p className="mt-1 font-extrabold text-slate-900">{formatCurrency(contract.monthly_amount)}</p></div>
+                  <div><p className="text-slate-400">Entrada de compra</p><p className="mt-1 font-extrabold text-slate-900">{formatCurrency(contract.deposit_amount)}</p></div>
                   <div><p className="text-slate-400">Inicio</p><p className="mt-1 font-bold text-slate-700">{formatDate(contract.start_date)}</p></div>
-                  <div><p className="text-slate-400">Mensalidades</p><p className="mt-1 font-bold text-slate-700">{contract.term_months}</p></div>
+                  <div><p className="text-slate-400">Cobrancas</p><p className="mt-1 font-bold text-slate-700">{contract.term_months} | {paymentFrequencyLabel[contract.payment_frequency]}</p></div>
                 </div>
-                {contract.deposit_as_first_installment && <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Contrato historico: a caucao permanece registrada conforme a regra vigente na criacao.</div>}
+                {contract.deposit_as_first_installment && <div className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Contrato historico: a entrada permanece registrada conforme a regra vigente na criacao.</div>}
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <button className="btn-secondary flex-1" type="button" onClick={() => setExpandedContractId(expanded ? null : contract.id)}><FileText className="h-4 w-4" />Documentos <ChevronDown className={`h-4 w-4 transition ${expanded ? 'rotate-180' : ''}`} /></button>
                   {canManage && ['active', 'overdue'].includes(contract.status) && <button className="btn-secondary flex-1" type="button" onClick={() => openEditModal(contract)}><PencilLine className="h-4 w-4" />Editar contrato</button>}
@@ -353,28 +364,29 @@ export default function ContractsPage() {
       )}
 
       {modalOpen && (
-        <Modal title={editingContract ? 'Editar contrato' : 'Novo contrato de locacao'} description={editingContract ? editingContract.contract_number : 'Revise as condicoes, mensalidades e entrega antes de salvar.'} onClose={closeModal}>
+        <Modal title={editingContract ? 'Editar contrato' : 'Novo contrato de locacao'} description={editingContract ? editingContract.contract_number : 'Revise as condicoes, cobrancas e entrega antes de salvar.'} onClose={closeModal}>
           <form className="space-y-6" onSubmit={form.handleSubmit((values) => mutation.mutate({ values, contract: editingContract }))}>
             {mutation.error && <ErrorState error={mutation.error} />}
             {creationStage && <div className="alert alert-success flex items-center gap-2"><LoaderCircle className="h-4 w-4 animate-spin" />{creationStage}</div>}
-            {editingContract?.deposit_as_first_installment && <div className="alert border-amber-200 bg-amber-50 text-amber-800">Este contrato e historico. A edicao preservara a caucao como foi registrada originalmente.</div>}
+            {editingContract?.deposit_as_first_installment && <div className="alert border-amber-200 bg-amber-50 text-amber-800">Este contrato e historico. A edicao preservara a entrada como foi registrada originalmente.</div>}
             {missingRelatedData.length > 0 && <div className="alert border-amber-200 bg-amber-50 text-amber-800">Revise o cadastro antes do PDF: {missingRelatedData.join(', ')}.</div>}
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-field"><span>Cliente *</span><select className="input" {...form.register('client_id')}><option value="">Selecione</option>{clientsQuery.data?.map((client) => <option key={client.id} value={client.id}>{client.full_name} | {client.cpf}</option>)}</select></label>
               <label className="form-field"><span>iPhone *</span><select className="input" {...form.register('device_id')}><option value="">Selecione</option>{formDevices.map((device) => <option key={device.id} value={device.id}>{device.model} | SN {device.serial_number}</option>)}</select></label>
               <label className="form-field"><span>Data de inicio *</span><input className="input" type="date" {...form.register('start_date')} /></label>
-              <label className="form-field"><span>Data da primeira mensalidade *</span><input className="input" type="date" {...form.register('first_installment_date')} />{form.formState.errors.first_installment_date && <small className="text-red-600">{form.formState.errors.first_installment_date.message}</small>}</label>
+              <label className="form-field"><span>Frequência de pagamento *</span>{editingContract?.deposit_as_first_installment ? <><input type="hidden" {...form.register('payment_frequency')} /><input className="input" readOnly value="Mensal" /></> : <select className="input" {...form.register('payment_frequency')}><option value="daily">Diário</option><option value="weekly">Semanal</option><option value="biweekly">Quinzenal</option><option value="monthly">Mensal</option></select>}</label>
+              <label className="form-field"><span>Data da primeira cobranca *</span><input className="input" type="date" {...form.register('first_installment_date')} />{form.formState.errors.first_installment_date && <small className="text-red-600">{form.formState.errors.first_installment_date.message}</small>}</label>
             </div>
 
             <section className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
               <h3 className="font-display text-xl text-slate-950">Resumo financeiro</h3>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label className="form-field"><span>Quantidade de mensalidades (1 a 60)</span><input className="input" type="number" min="1" max="60" step="1" {...form.register('term_months', { valueAsNumber: true })} /></label>
-                <label className="form-field"><span>Valor da mensalidade *</span><input className="input" type="number" min="0.01" step="0.01" {...form.register('monthly_amount', { valueAsNumber: true })} /></label>
-                <label className="form-field"><span>Valor da caucao</span><input className="input" type="number" min="0" step="0.01" readOnly={Boolean(editingContract?.deposit_as_first_installment)} {...form.register('deposit_amount', { valueAsNumber: true })} /></label>
-                <label className="form-field"><span>Data de pagamento da caucao</span><input className="input" type="date" disabled={Number(watched.deposit_amount) <= 0} readOnly={Boolean(editingContract?.deposit_as_first_installment)} {...form.register('deposit_paid_at')} /></label>
-                <label className="form-field"><span>Forma de pagamento da caucao</span><select className="input" disabled={Number(watched.deposit_amount) <= 0 || Boolean(editingContract?.deposit_as_first_installment)} {...form.register('deposit_payment_method')}><option value="">Selecione</option><option value="pix">Pix</option><option value="card">Cartao</option><option value="transfer">Transferencia</option><option value="cash">Dinheiro</option><option value="other">Outro</option></select></label>
-                <label className="form-field"><span>Dia de vencimento</span><input className="input" type="number" min="1" max="31" {...form.register('due_day', { valueAsNumber: true })} /></label>
+                <label className="form-field"><span>Quantidade de cobrancas (1 a 60)</span><input className="input" type="number" min="1" max="60" step="1" {...form.register('term_months', { valueAsNumber: true })} /></label>
+                <label className="form-field"><span>{paymentAmountLabel[selectedFrequency]} *</span><input className="input" type="number" min="0.01" step="0.01" {...form.register('monthly_amount', { valueAsNumber: true })} /></label>
+                <label className="form-field"><span>Entrada para compra futura</span><input className="input" type="number" min="0" step="0.01" readOnly={Boolean(editingContract?.deposit_as_first_installment)} {...form.register('deposit_amount', { valueAsNumber: true })} /></label>
+                <label className="form-field"><span>Data de pagamento da entrada</span><input className="input" type="date" disabled={Number(watched.deposit_amount) <= 0} readOnly={Boolean(editingContract?.deposit_as_first_installment)} {...form.register('deposit_paid_at')} /></label>
+                <label className="form-field"><span>Forma de pagamento da entrada</span><select className="input" disabled={Number(watched.deposit_amount) <= 0 || Boolean(editingContract?.deposit_as_first_installment)} {...form.register('deposit_payment_method')}><option value="">Selecione</option><option value="pix">Pix</option><option value="card">Cartao</option><option value="transfer">Transferencia</option><option value="cash">Dinheiro</option><option value="other">Outro</option></select></label>
+                {selectedFrequency === 'monthly' && <label className="form-field"><span>Dia de vencimento mensal</span><input className="input" type="number" min="1" max="31" {...form.register('due_day', { valueAsNumber: true })} /></label>}
                 <label className="form-field"><span>Multa por atraso (%)</span><input className="input" type="number" step="0.01" {...form.register('late_fee_percent', { valueAsNumber: true })} /></label>
                 <label className="form-field"><span>Juros diarios (%)</span><input className="input" type="number" step="0.001" {...form.register('daily_interest_percent', { valueAsNumber: true })} /></label>
                 <label className="form-field"><span>Valor de indenizacao *</span><input className="input" type="number" min="0.01" step="0.01" {...form.register('indemnity_value', { valueAsNumber: true })} /></label>
@@ -382,17 +394,17 @@ export default function ContractsPage() {
                 <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm font-bold text-slate-700 sm:col-span-2"><input type="checkbox" className="h-4 w-4 accent-cyan-700" {...form.register('purchase_option')} />Permitir opcao de compra</label>
               </div>
               <div className="mt-4 grid gap-3 rounded-2xl bg-slate-950 p-4 text-white sm:grid-cols-4">
-                <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Caucao separada</p><p className="mt-1 font-extrabold">{formatCurrency(contractPlan.depositAmount)}</p></div>
-                <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mensalidades</p><p className="mt-1 font-extrabold">{contractPlan.monthlyInstallments} x {formatCurrency(Number(watched.monthly_amount || 0))}</p></div>
+                <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Entrada de compra</p><p className="mt-1 font-extrabold">{formatCurrency(contractPlan.depositAmount)}</p></div>
+                <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cobrancas | {paymentFrequencyLabel[selectedFrequency]}</p><p className="mt-1 font-extrabold">{contractPlan.monthlyInstallments} x {formatCurrency(Number(watched.monthly_amount || 0))}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total do contrato</p><p className="mt-1 font-extrabold text-cyan-300">{formatCurrency(contractPlan.totalContract)}</p></div>
                 <div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Saldo apos o ato</p><p className="mt-1 font-extrabold">{formatCurrency(contractPlan.remainingBalance)}</p></div>
               </div>
             </section>
 
             <section className="rounded-2xl border border-cyan-200 bg-cyan-50/60 p-4">
-              <p className="flex items-center gap-2 text-sm font-bold text-cyan-900"><CalendarDays className="h-4 w-4" />Datas das mensalidades</p>
+              <p className="flex items-center gap-2 text-sm font-bold text-cyan-900"><CalendarDays className="h-4 w-4" />Calendário de cobranças | {paymentFrequencyLabel[selectedFrequency]}</p>
               <div className="mt-3 max-h-56 overflow-auto rounded-xl bg-white"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-slate-950 text-white"><tr><th className="p-3">Parcela</th><th className="p-3">Vencimento</th><th className="p-3">Valor</th><th className="p-3">Status</th></tr></thead><tbody>{preview.map((item) => <tr key={item.installmentNumber} className="border-b border-slate-100"><td className="p-3 font-bold">{item.installmentNumber}</td><td className="p-3">{formatDate(item.dueDate)}</td><td className="p-3">{formatCurrency(item.amount)}</td><td className="p-3 text-slate-400">Pendente</td></tr>)}</tbody></table></div>
-              <p className="mt-3 flex items-center gap-2 text-[11px] text-cyan-800"><ShieldCheck className="h-3.5 w-3.5" />A caucao nao aparece nesta tabela e nao altera a numeracao.</p>
+              <p className="mt-3 flex items-center gap-2 text-[11px] text-cyan-800"><ShieldCheck className="h-3.5 w-3.5" />A entrada de compra e nao reembolsavel, fica fora desta tabela e nao altera a numeracao das cobrancas.</p>
             </section>
 
             <section className="rounded-2xl border border-slate-200 p-4">

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { buildContractSections, formatInstallmentStatus } from './content.js';
+import { buildContractSections, contractPaymentFrequencyLabel, formatInstallmentStatus } from './content.js';
 import { formatCurrency, formatDate } from './formatters.js';
 import { ContractPdfWriter } from './pdf-writer.js';
 import type { ContractPdfData } from './types.js';
@@ -66,18 +66,19 @@ export async function generateContractPdf(data: ContractPdfData): Promise<Uint8A
 
     if (section.title === 'CAPÍTULO V - DO PREÇO E DA FORMA DE PAGAMENTO') {
       const summaryRows: Array<Array<[string, string]>> = [
-        [['Caução paga no ato', formatCurrency(data.financial.depositAmount)], ['Mensalidade', formatCurrency(data.financial.monthlyAmount)]],
-        [['Quantidade de mensalidades', String(data.financial.installmentCount)], ['Total das mensalidades', formatCurrency(data.financial.monthlyTotal)]],
-        [['Valor total do contrato', formatCurrency(data.financial.totalContract)], ['Valor já recebido', formatCurrency(data.financial.amountReceived)]],
-        [['Saldo restante', formatCurrency(data.financial.remainingBalance)], ['Forma de pagamento da caução', paymentMethodLabel(data.financial.depositPaymentMethod)]],
-        [['Data de pagamento da caução', formatDate(data.financial.depositPaidAt)], ['Vigência', `${formatDate(data.startDate)} a ${formatDate(data.endDate)}`]],
+        [['Entrada de compra paga no ato', formatCurrency(data.financial.depositAmount)], ['Valor por cobrança', formatCurrency(data.financial.monthlyAmount)]],
+        [['Quantidade de cobranças', String(data.financial.installmentCount)], ['Frequência', contractPaymentFrequencyLabel[data.paymentFrequency]]],
+        [['Total das cobranças', formatCurrency(data.financial.monthlyTotal)], ['Valor total do contrato', formatCurrency(data.financial.totalContract)]],
+        [['Valor já recebido', formatCurrency(data.financial.amountReceived)], ['Saldo restante', formatCurrency(data.financial.remainingBalance)]],
+        [['Forma de pagamento da entrada', paymentMethodLabel(data.financial.depositPaymentMethod)], ['Data de pagamento da entrada', formatDate(data.financial.depositPaidAt)]],
+        [['Vigência', `${formatDate(data.startDate)} a ${formatDate(data.endDate)}`]],
       ];
       if (data.financial.purchaseOption) {
         summaryRows.push([['Valor da opção de compra', formatCurrency(data.financial.purchaseOptionAmount ?? 0)]]);
       }
       pdf.legalSubheading('QUADRO RESUMO');
       pdf.legalGrid(summaryRows);
-      pdf.legalSubheading('MENSALIDADES');
+      pdf.legalSubheading('CRONOGRAMA DE PAGAMENTOS');
       pdf.legalDataTable(
         ['Parcela', 'Vencimento', 'Valor', 'Status', 'Pagamento'],
         data.installments.map((item) => [

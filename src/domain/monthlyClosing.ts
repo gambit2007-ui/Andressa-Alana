@@ -18,6 +18,7 @@ export type MonthlyCashClosing = {
   recordedPurchaseOutflows: number;
   purchaseOutflows: number;
   extraExpenses: number;
+  depositRefunds: number;
   reversals: number;
   ownerWithdrawals: number;
   totalOutflows: number;
@@ -27,17 +28,20 @@ export type MonthlyCashClosing = {
 };
 
 const purchaseKinds = new Set(['asset_purchase', 'device_purchase', 'supplier']);
+const depositRefundKinds = new Set(['deposit_refund', 'deposit_return', 'security_deposit_refund']);
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 const monthKey = (value: string) => value.slice(0, 7);
 
-const isLegacyDeposit = (transaction: ClosingTransaction) => transaction.kind === 'rental_payment'
-  && (transaction.description ?? '')
+const isLegacyDeposit = (transaction: ClosingTransaction) => {
+  if (transaction.kind !== 'rental_payment') return false;
+  const description = (transaction.description ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .includes('caucao');
+    .toLowerCase();
+  return description.includes('caucao') || description.includes('entrada de compra');
+};
 
 const monthRange = (start: string, end: string): string[] => {
   const result: string[] = [];
@@ -93,11 +97,15 @@ export function buildMonthlyCashClosings(
     const reversals = outflows
       .filter((transaction) => transaction.kind === 'payment_reversal')
       .reduce((sum, transaction) => sum + transaction.amount, 0);
+    const depositRefunds = outflows
+      .filter((transaction) => depositRefundKinds.has(transaction.kind))
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
     const ownerWithdrawals = outflows
       .filter((transaction) => transaction.kind === 'withdrawal')
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const extraExpenses = outflows
       .filter((transaction) => !purchaseKinds.has(transaction.kind)
+        && !depositRefundKinds.has(transaction.kind)
         && transaction.kind !== 'payment_reversal'
         && transaction.kind !== 'withdrawal')
       .reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -107,7 +115,7 @@ export function buildMonthlyCashClosings(
     // Registered inventory is the source of truth for device purchases. Manual
     // purchase entries remain a fallback for historical months without devices.
     const purchaseOutflows = inventoryPurchases > 0 ? inventoryPurchases : recordedPurchaseOutflows;
-    const totalOutflows = purchaseOutflows + extraExpenses + reversals + ownerWithdrawals;
+    const totalOutflows = purchaseOutflows + extraExpenses + depositRefunds + reversals + ownerWithdrawals;
     const openingBalance = runningBalance;
     const netMovement = totalEntries - totalOutflows;
     runningBalance = roundMoney(openingBalance + netMovement);
@@ -124,6 +132,7 @@ export function buildMonthlyCashClosings(
       recordedPurchaseOutflows: roundMoney(recordedPurchaseOutflows),
       purchaseOutflows: roundMoney(purchaseOutflows),
       extraExpenses: roundMoney(extraExpenses),
+      depositRefunds: roundMoney(depositRefunds),
       reversals: roundMoney(reversals),
       ownerWithdrawals: roundMoney(ownerWithdrawals),
       totalOutflows: roundMoney(totalOutflows),

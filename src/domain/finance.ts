@@ -1,5 +1,5 @@
-import { addMonths, differenceInCalendarDays, getDaysInMonth, parseISO } from 'date-fns';
-import type { AppRole, ContractStatus, InstallmentStatus } from '../types';
+import { addDays, addMonths, differenceInCalendarDays, format, getDaysInMonth, parseISO } from 'date-fns';
+import type { AppRole, ContractStatus, InstallmentStatus, PaymentFrequency } from '../types';
 import { calculateContractPlan, roundMoney } from './contractPlan';
 
 export { calculateContractPlan } from './contractPlan';
@@ -8,6 +8,20 @@ export type InstallmentDraft = {
   installmentNumber: number;
   dueDate: string;
   amount: number;
+};
+
+export const paymentFrequencyLabel: Record<PaymentFrequency, string> = {
+  daily: 'Diário',
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+  monthly: 'Mensal',
+};
+
+export const paymentAmountLabel: Record<PaymentFrequency, string> = {
+  daily: 'Valor da diária',
+  weekly: 'Valor semanal',
+  biweekly: 'Valor quinzenal',
+  monthly: 'Valor mensal',
 };
 
 export function dueDateForMonth(startDate: string, monthOffset: number, dueDay: number): string {
@@ -22,18 +36,38 @@ export function dueDateForMonth(startDate: string, monthOffset: number, dueDay: 
 export function generateInstallmentSchedule(input: {
   startDate?: string;
   firstInstallmentDate?: string;
+  paymentFrequency?: PaymentFrequency;
   dueDay: number;
   termMonths: number;
   monthlyAmount: number;
 }): InstallmentDraft[] {
   const firstDueDate = input.firstInstallmentDate
     ?? dueDateForMonth(input.startDate ?? new Date().toISOString().slice(0, 10), 1, input.dueDay);
+  const frequency = input.paymentFrequency ?? 'monthly';
+
+  const dueDateForInstallment = (index: number): string => {
+    if (index === 0) return firstDueDate;
+    if (frequency === 'daily') return format(addDays(parseISO(firstDueDate), index), 'yyyy-MM-dd');
+    if (frequency === 'weekly') return format(addDays(parseISO(firstDueDate), index * 7), 'yyyy-MM-dd');
+    if (frequency === 'biweekly') return format(addDays(parseISO(firstDueDate), index * 14), 'yyyy-MM-dd');
+    return dueDateForMonth(firstDueDate, index, input.dueDay);
+  };
 
   return Array.from({ length: input.termMonths }, (_, index) => ({
     installmentNumber: index + 1,
-    dueDate: index === 0 ? firstDueDate : dueDateForMonth(firstDueDate, index, input.dueDay),
+    dueDate: dueDateForInstallment(index),
     amount: roundMoney(input.monthlyAmount),
   }));
+}
+
+export function monthlyEquivalentRevenue(amount: number, frequency: PaymentFrequency): number {
+  const multiplier: Record<PaymentFrequency, number> = {
+    daily: 365 / 12,
+    weekly: 52 / 12,
+    biweekly: 26 / 12,
+    monthly: 1,
+  };
+  return roundMoney(amount * multiplier[frequency]);
 }
 
 export function calculateCharges(input: {
@@ -102,18 +136,18 @@ export function calculateProfitability(input: {
 
 export function calculateCashSummary(input: {
   confirmedPayments: number[];
-  heldDeposits: number[];
+  purchaseEntries: number[];
   expenses: number[];
 }) {
   const receivedRevenue = roundMoney(input.confirmedPayments.reduce((sum, value) => sum + value, 0));
-  const depositsHeld = roundMoney(input.heldDeposits.reduce((sum, value) => sum + value, 0));
+  const purchaseEntryRevenue = roundMoney(input.purchaseEntries.reduce((sum, value) => sum + value, 0));
   const expenses = roundMoney(input.expenses.reduce((sum, value) => sum + value, 0));
   return {
     receivedRevenue,
-    depositsHeld,
+    purchaseEntryRevenue,
     expenses,
-    cashBalance: roundMoney(receivedRevenue + depositsHeld - expenses),
-    operationalResult: roundMoney(receivedRevenue - expenses),
+    cashBalance: roundMoney(receivedRevenue + purchaseEntryRevenue - expenses),
+    operationalResult: roundMoney(receivedRevenue + purchaseEntryRevenue - expenses),
   };
 }
 

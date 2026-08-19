@@ -25,7 +25,6 @@ import { EmptyState, ErrorState, LoadingState, Modal, PageHeader } from '../../c
 import { FinancialExecutivePanel } from './FinancialExecutivePanel';
 import {
   closeFinancialMonth,
-  consolidateCashLedger,
   createCashTransaction,
   listCashTransactions,
   listDevices,
@@ -78,14 +77,11 @@ const paymentMethodLabel: Record<string, string> = {
 const entryCategories = [
   { value: 'other_income', label: 'Receita diversa' },
   { value: 'capital_contribution', label: 'Aporte' },
-  { value: 'device_sale', label: 'Venda de aparelho' },
-  { value: 'deposit_received', label: 'Caucao recebida' },
 ];
 
 const withdrawalCategories = [
   { value: 'operating_expense', label: 'Despesa operacional' },
   { value: 'maintenance', label: 'Manutencao' },
-  { value: 'supplier', label: 'Fornecedor' },
   { value: 'tax', label: 'Imposto ou taxa' },
   { value: 'withdrawal', label: 'Retirada' },
 ];
@@ -99,6 +95,10 @@ const categoryLabel = Object.fromEntries([
   ...entryCategories,
   ...withdrawalCategories,
   { value: 'rental_payment', label: 'Recebimento de locacao' },
+  { value: 'device_sale', label: 'Venda de aparelho' },
+  { value: 'deposit_received', label: 'Entrada de compra recebida' },
+  { value: 'supplier', label: 'Compra ou fornecedor' },
+  { value: 'deposit_refund', label: 'Correcao de entrada de compra' },
   { value: 'payment_reversal', label: 'Estorno de recebimento' },
 ].map((item) => [item.value, item.label]));
 
@@ -222,8 +222,7 @@ export default function FinancePage() {
   const [selectedMonth, setSelectedMonth] = useState(today().slice(0, 7));
   const [selectedYear, setSelectedYear] = useState(Number(today().slice(0, 4)));
   const [cashModalOpen, setCashModalOpen] = useState(false);
-  const [consolidationOpen, setConsolidationOpen] = useState(false);
-  const [consolidationNotice, setConsolidationNotice] = useState<string | null>(null);
+  const [financeNotice, setFinanceNotice] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<ClientFinanceGroup | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
   const [amount, setAmount] = useState(0);
@@ -287,15 +286,6 @@ export default function FinancePage() {
     },
   });
 
-  const consolidationMutation = useMutation({
-    mutationFn: () => consolidateCashLedger(profile.organization_id, today()),
-    onSuccess: async (result) => {
-      await refreshFinance();
-      setConsolidationOpen(false);
-      setConsolidationNotice(`Caixa consolidado. ${result.reversedContributions} aporte(s) anterior(es) estornado(s); aporte unico e frete conferidos.`);
-    },
-  });
-
   const closeMonthMutation = useMutation({
     mutationFn: (month: ProfessionalMonthMetrics) => closeFinancialMonth(
       profile.organization_id,
@@ -304,7 +294,7 @@ export default function FinancePage() {
     ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['financial-month-closings'] });
-      setConsolidationNotice('Mes financeiro fechado. O snapshot foi preservado para auditoria.');
+      setFinanceNotice('Mes financeiro fechado. O snapshot foi preservado para auditoria.');
       setMonthAction(null);
     },
   });
@@ -313,7 +303,7 @@ export default function FinancePage() {
     mutationFn: (month: ProfessionalMonthMetrics) => reopenFinancialMonth(month.closingId!),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['financial-month-closings'] });
-      setConsolidationNotice('Mes financeiro reaberto para ajustes.');
+      setFinanceNotice('Mes financeiro reaberto para ajustes.');
       setMonthAction(null);
     },
   });
@@ -368,7 +358,7 @@ export default function FinancePage() {
 
   if (installmentsQuery.isLoading || paymentsQuery.isLoading || cashQuery.isLoading || devicesQuery.isLoading || salesQuery.isLoading || closingsQuery.isLoading) return <LoadingState />;
   const canManageFinance = ['admin', 'manager', 'finance'].includes(profile.role);
-  const canConsolidateFinance = ['admin', 'manager'].includes(profile.role);
+  const canCloseFinance = ['admin', 'manager'].includes(profile.role);
   const categories = cashDirection === 'in' ? entryCategories : withdrawalCategories;
 
   const chooseDirection = (direction: 'in' | 'out') => {
@@ -440,10 +430,7 @@ export default function FinancePage() {
         eyebrow="Caixa, clientes e cobranca"
         title="Financeiro"
         action={canManageFinance && (
-          <div className="flex flex-wrap gap-2">
-            {canConsolidateFinance && <button className="btn-secondary" type="button" onClick={() => { consolidationMutation.reset(); setConsolidationOpen(true); }}><Landmark className="h-4 w-4" />Consolidar caixa</button>}
-            <button className="btn-primary" type="button" onClick={() => setCashModalOpen(true)}><Plus className="h-4 w-4" />Nova movimentacao</button>
-          </div>
+          <button className="btn-primary" type="button" onClick={() => setCashModalOpen(true)}><Plus className="h-4 w-4" />Nova movimentacao</button>
         )}
       />
 
@@ -453,14 +440,14 @@ export default function FinancePage() {
       {devicesQuery.error && <ErrorState error={devicesQuery.error} />}
       {salesQuery.error && <ErrorState error={salesQuery.error} />}
       {closingsQuery.error && <ErrorState error={closingsQuery.error} />}
-      {consolidationNotice && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">{consolidationNotice}</div>}
+      {financeNotice && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-semibold text-emerald-800">{financeNotice}</div>}
 
       <FinancialExecutivePanel
         summary={financeSummary}
         years={financeYears}
         selectedMonth={selectedMonth}
         currentMonth={referenceMonth}
-        canClose={canConsolidateFinance && Boolean(closingsQuery.data?.available)}
+        canClose={canCloseFinance && Boolean(closingsQuery.data?.available)}
         actionPending={closeMonthMutation.isPending || reopenMonthMutation.isPending}
         onYearChange={handleYearChange}
         onMonthChange={setSelectedMonth}
@@ -532,16 +519,18 @@ export default function FinancePage() {
                   <strong className="text-lg font-extrabold">{formatCurrency(section.total)}</strong>
                 </header>
 
-                <div className="grid grid-cols-2 gap-px bg-slate-200/80 text-xs">
+                <div className="grid grid-cols-3 gap-px bg-slate-200/80 text-xs">
                   {section.key === 'in' ? (
                     <>
-                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Receitas da operacao</span><strong className="mt-1 block text-emerald-700">{formatCurrency(Math.max(0, (selectedClosing?.cashEntries ?? 0) - (selectedClosing?.capitalAdded ?? 0)))}</strong></div>
+                      <div className="bg-white px-4 py-3"><span className="block text-slate-500">Receita operacional</span><strong className="mt-1 block text-emerald-700">{formatCurrency(selectedClosing?.operationalRevenue ?? 0)}</strong></div>
+                      <div className="bg-white px-4 py-3"><span className="block text-slate-500">Entradas de compra</span><strong className="mt-1 block text-amber-700">{formatCurrency(selectedClosing?.depositIncome ?? 0)}</strong></div>
                       <div className="bg-white px-5 py-3"><span className="block text-slate-500">Aportes ao caixa</span><strong className="mt-1 block text-slate-900">{formatCurrency(selectedClosing?.capitalAdded ?? 0)}</strong></div>
                     </>
                   ) : (
                     <>
-                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Compras de estoque</span><strong className="mt-1 block text-red-700">{formatCurrency(selectedClosing?.inventoryPurchases ?? 0)}</strong></div>
-                      <div className="bg-white px-5 py-3"><span className="block text-slate-500">Demais saidas</span><strong className="mt-1 block text-red-700">{formatCurrency(Math.max(0, (selectedClosing?.cashOutflows ?? 0) - (selectedClosing?.inventoryPurchases ?? 0)))}</strong></div>
+                      <div className="bg-white px-4 py-3"><span className="block text-slate-500">Compras de estoque</span><strong className="mt-1 block text-red-700">{formatCurrency(selectedClosing?.inventoryPurchases ?? 0)}</strong></div>
+                      <div className="bg-white px-4 py-3"><span className="block text-slate-500">Despesas operacionais</span><strong className="mt-1 block text-red-700">{formatCurrency(selectedClosing?.operatingExpenses ?? 0)}</strong></div>
+                      <div className="bg-white px-4 py-3"><span className="block text-slate-500">Estornos e retiradas</span><strong className="mt-1 block text-red-700">{formatCurrency((selectedClosing?.depositRefunds ?? 0) + (selectedClosing?.reversals ?? 0) + (selectedClosing?.ownerWithdrawals ?? 0))}</strong></div>
                     </>
                   )}
                 </div>
@@ -656,7 +645,7 @@ export default function FinancePage() {
                         <div className="divide-y divide-slate-100 border-t border-slate-100">
                           {clientReceipts.map((receipt) => (
                             <div key={receipt.key} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:px-6">
-                              <div className="min-w-0 flex-1"><p className="font-bold text-slate-800">{receipt.externalReference === 'upfront_deposit' ? 'Caucao inicial' : 'Recebimento'} - {paymentMethodLabel[receipt.method] ?? receipt.method}</p><p className="mt-0.5 text-xs text-slate-500">{formatDate(receipt.paidAt)}{receipt.reversalReason ? ` - ${receipt.reversalReason}` : ''}</p></div>
+                              <div className="min-w-0 flex-1"><p className="font-bold text-slate-800">{receipt.externalReference === 'upfront_deposit' ? 'Entrada para compra futura' : 'Recebimento'} - {paymentMethodLabel[receipt.method] ?? receipt.method}</p><p className="mt-0.5 text-xs text-slate-500">{formatDate(receipt.paidAt)}{receipt.reversalReason ? ` - ${receipt.reversalReason}` : ''}</p></div>
                               <p className="font-extrabold text-slate-950">{formatCurrency(receipt.amount)}</p>
                               <span className={`status-pill ${receipt.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{receipt.status === 'confirmed' ? 'Confirmado' : 'Estornado'}</span>
                               {canManageFinance && receipt.status === 'confirmed' && <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs text-red-700" type="button" onClick={() => openReversal(receipt)}><RotateCcw className="h-3.5 w-3.5" />Estornar</button>}
@@ -687,7 +676,7 @@ export default function FinancePage() {
               <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Saldo final</p><p className="mt-1 font-extrabold text-slate-950">{formatCurrency(monthAction.month.closingBalance)}</p></div>
               <div><p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Resultado operacional</p><p className={`mt-1 font-extrabold ${monthAction.month.operationalResult >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(monthAction.month.operationalResult)}</p></div>
             </div>
-            <p className="text-sm leading-6 text-slate-600">{monthAction.type === 'close' ? 'Aportes e compras de estoque permanecem no fluxo de caixa, mas nao alteram o resultado operacional. Para corrigir um mes fechado, sera necessario reabri-lo.' : 'O snapshot anterior continuara registrado na auditoria e um novo fechamento podera ser criado depois dos ajustes.'}</p>
+            <p className="text-sm leading-6 text-slate-600">{monthAction.type === 'close' ? 'Aportes e compras de estoque permanecem fora do resultado operacional. Entradas de compra sao receitas contratuais nao reembolsaveis e integram o resultado. Para corrigir um mes fechado, sera necessario reabri-lo.' : 'O snapshot anterior continuara registrado na auditoria e um novo fechamento podera ser criado depois dos ajustes.'}</p>
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
               <button className="btn-secondary" type="button" disabled={closeMonthMutation.isPending || reopenMonthMutation.isPending} onClick={() => setMonthAction(null)}>Cancelar</button>
               <button className="btn-primary" type="button" disabled={closeMonthMutation.isPending || reopenMonthMutation.isPending} onClick={() => {
@@ -702,29 +691,14 @@ export default function FinancePage() {
         </Modal>
       )}
 
-      {consolidationOpen && (
-        <Modal title="Consolidar caixa" description="Esta operacao preserva o historico e pode ser executada novamente sem duplicar valores." onClose={() => { if (!consolidationMutation.isPending) setConsolidationOpen(false); }}>
-          <div className="space-y-5">
-            {consolidationMutation.error && <ErrorState error={consolidationMutation.error} />}
-            <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <p><strong>Aportes antigos:</strong> serao estornados, sem exclusao do historico.</p>
-              <p><strong>Novo aporte unico:</strong> R$ 24.000,00 para compras e operacoes.</p>
-              <p><strong>Nova saida:</strong> R$ 1.200,00 referente ao Frete Wendel.</p>
-              <p><strong>Sem alteracao:</strong> compras dos aparelhos, vendas diretas e caucoes continuarao vindo dos registros do app.</p>
-            </div>
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end"><button className="btn-secondary" disabled={consolidationMutation.isPending} type="button" onClick={() => setConsolidationOpen(false)}>Cancelar</button><button className="btn-primary" disabled={consolidationMutation.isPending} type="button" onClick={() => consolidationMutation.mutate()}><Landmark className="h-4 w-4" />{consolidationMutation.isPending ? 'Consolidando...' : 'Confirmar consolidacao'}</button></div>
-          </div>
-        </Modal>
-      )}
-
       {cashModalOpen && (
-        <Modal title="Nova movimentacao" onClose={closeCashModal}>
+        <Modal title="Nova movimentacao manual" description="Use apenas para aportes, receitas diversas, despesas, impostos ou retiradas." onClose={closeCashModal}>
           <form className="space-y-5" onSubmit={cashForm.handleSubmit((values) => cashMutation.mutate(values))}>
             {cashMutation.error && <ErrorState error={cashMutation.error} />}
             <input type="hidden" {...cashForm.register('direction')} />
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5">
               <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'in' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('in')}>Entrada</button>
-              <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'out' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('out')}>Retirada</button>
+              <button className={`min-h-11 rounded-xl px-4 text-sm font-bold transition ${cashDirection === 'out' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500'}`} type="button" onClick={() => chooseDirection('out')}>Saida</button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="form-field"><span>Valor *</span><input className="input" type="number" min="0.01" step="0.01" {...cashForm.register('amount', { valueAsNumber: true })} />{cashForm.formState.errors.amount && <small>{cashForm.formState.errors.amount.message}</small>}</label>
@@ -732,6 +706,7 @@ export default function FinancePage() {
             </div>
             <label className="form-field"><span>Categoria *</span><select className="input" {...cashForm.register('kind')}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>{cashForm.formState.errors.kind && <small>{cashForm.formState.errors.kind.message}</small>}</label>
             <label className="form-field"><span>Descricao *</span><input className="input" placeholder="Identifique a movimentacao" {...cashForm.register('description')} />{cashForm.formState.errors.description && <small>{cashForm.formState.errors.description.message}</small>}</label>
+            <p className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-900">Vendas, caucoes, compras de aparelhos e pagamentos de clientes sao registrados automaticamente pelos respectivos modulos.</p>
             <div className="flex justify-end gap-3 border-t border-slate-200 pt-5"><button className="btn-secondary" type="button" onClick={closeCashModal}>Cancelar</button><button className="btn-primary" disabled={cashMutation.isPending} type="submit"><Banknote className="h-4 w-4" />{cashMutation.isPending ? 'Registrando...' : 'Registrar movimentacao'}</button></div>
           </form>
         </Modal>

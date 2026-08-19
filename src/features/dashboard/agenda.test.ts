@@ -10,6 +10,7 @@ const contract = (id: string, clientId: string, clientName: string): Contract =>
   contract_number: `GR-${id}`,
   start_date: '2026-08-01',
   end_date: '2027-01-01',
+  payment_frequency: 'monthly',
   due_day: 10,
   term_months: 5,
   monthly_amount: 850,

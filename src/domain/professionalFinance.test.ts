@@ -87,13 +87,15 @@ describe('buildProfessionalFinance', () => {
     expect(august.operationalRevenue).toBe(7565);
     expect(august.salesMargin).toBe(500);
     expect(august.operationalResult).toBe(3165);
+    expect(result.annualPurchaseEntries).toBe(3865);
+    expect(result.annualPurchaseEntryReversals).toBe(0);
     expect(result.accountsReceivable).toBe(1230);
     expect(result.overdueReceivables).toBe(380);
     expect(result.capitalInRentedFleet).toBe(16380);
     expect(result.annualContributions).toBe(24000);
   });
 
-  it('usa o snapshot quando o mes esta fechado', () => {
+  it('preserva o caixa fechado e recalcula os indicadores derivados', () => {
     const live = buildProfessionalFinance({
       transactions: [cash('income', 'in', 'other_income', 1000)],
       devices: [], installments: [], sales: [], selectedYear: 2026, referenceDate: '2026-08-08',
@@ -111,7 +113,7 @@ describe('buildProfessionalFinance', () => {
 
     expect(closed.months[7]!.closingStatus).toBe('closed');
     expect(closed.months[7]!.closingBalance).toBe(900);
-    expect(closed.months[7]!.operationalResult).toBe(700);
+    expect(closed.months[7]!.operationalResult).toBe(1000);
   });
 
   it('nao inclui lancamentos futuros no caixa atual', () => {

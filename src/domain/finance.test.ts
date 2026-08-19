@@ -9,6 +9,7 @@ import {
   canTransitionContract,
   dueDateForMonth,
   generateInstallmentSchedule,
+  monthlyEquivalentRevenue,
 } from './finance';
 
 describe('cronograma de parcelas', () => {
@@ -36,6 +37,29 @@ describe('cronograma de parcelas', () => {
     expect(schedule[0]).toEqual({ installmentNumber: 1, dueDate: '2026-09-03', amount: 480 });
     expect(schedule[3]?.dueDate).toBe('2026-12-10');
   });
+
+  it.each([
+    ['daily', ['2026-08-03', '2026-08-04', '2026-08-05']],
+    ['weekly', ['2026-08-03', '2026-08-10', '2026-08-17']],
+    ['biweekly', ['2026-08-03', '2026-08-17', '2026-08-31']],
+    ['monthly', ['2026-08-03', '2026-09-10', '2026-10-10']],
+  ] as const)('gera vencimentos na frequencia %s', (paymentFrequency, expectedDates) => {
+    const schedule = generateInstallmentSchedule({
+      firstInstallmentDate: '2026-08-03',
+      paymentFrequency,
+      dueDay: 10,
+      termMonths: 3,
+      monthlyAmount: 100,
+    });
+    expect(schedule.map((item) => item.dueDate)).toEqual(expectedDates);
+  });
+
+  it('converte contratos recorrentes para receita mensal equivalente', () => {
+    expect(monthlyEquivalentRevenue(100, 'monthly')).toBe(100);
+    expect(monthlyEquivalentRevenue(100, 'weekly')).toBe(433.33);
+    expect(monthlyEquivalentRevenue(100, 'biweekly')).toBe(216.67);
+    expect(monthlyEquivalentRevenue(100, 'daily')).toBe(3041.67);
+  });
 });
 
 describe('encargos e pagamentos', () => {
@@ -50,20 +74,20 @@ describe('encargos e pagamentos', () => {
   });
 });
 
-describe('resultado, caucao, venda, ROI e payback', () => {
-  it('mantem a caucao separada de quatro mensalidades', () => {
+describe('resultado, entrada de compra, venda, ROI e payback', () => {
+  it('mantem a entrada de compra separada de quatro mensalidades', () => {
     expect(calculateContractPlan({ monthlyInstallments: 4, monthlyAmount: 480, depositAmount: 480 }))
       .toEqual({ monthlyInstallments: 4, monthlyTotal: 1920, depositAmount: 480, totalContract: 2400, amountReceived: 480, remainingBalance: 1920 });
   });
 
-  it('mantem apenas as mensalidades quando nao existe caucao', () => {
+  it('mantem apenas as mensalidades quando nao existe entrada de compra', () => {
     expect(calculateContractPlan({ monthlyInstallments: 4, monthlyAmount: 850, depositAmount: 0 }))
       .toEqual({ monthlyInstallments: 4, monthlyTotal: 3400, depositAmount: 0, totalContract: 3400, amountReceived: 0, remainingBalance: 3400 });
   });
 
-  it('nao reconhece caucao como receita operacional', () => {
-    expect(calculateCashSummary({ confirmedPayments: [700, 700], heldDeposits: [900], expenses: [200] }))
-      .toEqual({ receivedRevenue: 1400, depositsHeld: 900, expenses: 200, cashBalance: 2100, operationalResult: 1200 });
+  it('reconhece a entrada de compra como receita operacional nao reembolsavel', () => {
+    expect(calculateCashSummary({ confirmedPayments: [700, 700], purchaseEntries: [900], expenses: [200] }))
+      .toEqual({ receivedRevenue: 1400, purchaseEntryRevenue: 900, expenses: 200, cashBalance: 2100, operationalResult: 2100 });
   });
 
   it('inclui venda e custos vinculados na rentabilidade', () => {

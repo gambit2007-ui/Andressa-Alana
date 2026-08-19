@@ -27,6 +27,7 @@ type ContractRow = {
   start_date: string;
   end_date: string;
   first_installment_date: string | null;
+  payment_frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | null;
   term_months: number | string;
   monthly_amount: number | string;
   deposit_amount: number | string;
@@ -184,7 +185,7 @@ async function assemblePdfData(admin: SupabaseClient, contractId: string, profil
     admin.from('mdm_devices').select('status').eq('device_id', contract.device.id).maybeSingle(),
     loadPhotos(admin, contract.device.id, profile.organization_id),
   ]);
-  if (installmentsResult.error) throw new DocumentServiceError('Nao foi possivel consultar as mensalidades.', 500, 'installment_query_failed');
+  if (installmentsResult.error) throw new DocumentServiceError('Nao foi possivel consultar as cobrancas.', 500, 'installment_query_failed');
 
   const installments = (installmentsResult.data ?? [] as unknown[]).map((row) => {
     const item = row as unknown as InstallmentRow;
@@ -226,6 +227,7 @@ async function assemblePdfData(admin: SupabaseClient, contractId: string, profil
     startDate: contract.start_date,
     endDate: contract.end_date,
     firstInstallmentDate: contract.first_installment_date ?? installments[0]?.dueDate ?? contract.start_date,
+    paymentFrequency: contract.payment_frequency ?? 'monthly',
     venue: settings?.default_venue || settings?.city || null,
     lessor: {
       name: settings?.legal_name || contract.organization.name,

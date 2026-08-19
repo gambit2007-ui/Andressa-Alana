@@ -22,6 +22,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { PageHeader, ErrorState, LoadingState } from '../../components/ui';
+import { monthlyEquivalentRevenue } from '../../domain/finance';
 import { buildProfessionalFinance } from '../../domain/professionalFinance';
 import {
   listCashTransactions,
@@ -178,7 +179,9 @@ export default function DashboardPage() {
     const activeFleet = data.devices.filter((item) => !['sold', 'retired'].includes(item.status));
     const rented = activeFleet.filter((item) => item.status === 'rented').length;
     const fleetValue = activeFleet.reduce((sum, item) => sum + item.market_value, 0);
-    const mrr = data.contracts.filter((item) => ['active', 'overdue'].includes(item.status)).reduce((sum, item) => sum + item.monthly_amount, 0);
+    const mrr = data.contracts
+      .filter((item) => ['active', 'overdue'].includes(item.status))
+      .reduce((sum, item) => sum + monthlyEquivalentRevenue(item.monthly_amount, item.payment_frequency), 0);
     const invested = finance.capitalInRentedFleet;
     const profit = monthFinance.operationalResult;
     return {

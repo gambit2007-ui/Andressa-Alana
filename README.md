@@ -24,6 +24,10 @@ O modulo de documentos contratuais usa uma segunda migration incremental, sem al
 
 `supabase/migrations/202608040001_contract_pdf_module.sql`
 
+As frequencias diaria, semanal, quinzenal e mensal sao adicionadas de forma compativel pela migration:
+
+`supabase/migrations/202608190001_contract_payment_frequency.sql`
+
 ## Configuracao local
 
 1. Instale as dependencias:
@@ -101,7 +105,7 @@ Ao criar um contrato novo, o sistema salva primeiro os dados transacionais e dep
 - contrato de locacao
 - termo de entrega e vistoria
 
-Uma falha de PDF nao desfaz o contrato nem suas parcelas. O documento fica com status de falha e pode ser regenerado pela tela do contrato. Contratos historicos continuam com a regra financeira original; contratos novos registram a caucao separadamente e geram somente a quantidade informada de mensalidades.
+Uma falha de PDF nao desfaz o contrato nem suas parcelas. O documento fica com status de falha e pode ser regenerado pela tela do contrato. Contratos historicos continuam com a regra financeira original; contratos novos registram a entrada de compra separadamente e geram somente a quantidade informada de mensalidades.
 
 Endpoints autenticados:
 
@@ -174,4 +178,4 @@ npm run test
 npm run build
 ```
 
-Os testes cobrem dias 29/30/31, fevereiro e ano bissexto, multa e juros, pagamentos parcial/integral, caucao separada, venda, ROI, payback, transicoes, permissoes MDM, clausulas condicionais, versionamento, tolerancia a falha e geracao real dos dois PDFs.
+Os testes cobrem dias 29/30/31, fevereiro e ano bissexto, multa e juros, pagamentos parcial/integral, entrada de compra separada, venda, ROI, payback, transicoes, permissoes MDM, clausulas condicionais, versionamento, tolerancia a falha e geracao real dos dois PDFs.

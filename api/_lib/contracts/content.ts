@@ -1,4 +1,4 @@
-import type { ContractFinancialSummary, ContractInstallment, ContractPdfData } from './types.js';
+import type { ContractFinancialSummary, ContractInstallment, ContractPdfData, PaymentFrequency } from './types.js';
 import { calculateContractPlan, roundMoney } from '../../../src/domain/contractPlan.js';
 import { formatCurrency, formatDate } from './formatters.js';
 
@@ -16,6 +16,20 @@ const installmentStatusLabels: Record<string, string> = {
 export function formatInstallmentStatus(status: string): string {
   return installmentStatusLabels[status.toLowerCase()] ?? status;
 }
+
+const frequencyAdjectives: Record<PaymentFrequency, string> = {
+  daily: 'diárias',
+  weekly: 'semanais',
+  biweekly: 'quinzenais',
+  monthly: 'mensais',
+};
+
+export const contractPaymentFrequencyLabel: Record<PaymentFrequency, string> = {
+  daily: 'Diária',
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+  monthly: 'Mensal',
+};
 
 export function calculateFinancialSummary(input: {
   depositAmount: number;
@@ -59,9 +73,13 @@ export function calculateFinancialSummary(input: {
 }
 
 export function buildContractSections(data: ContractPdfData): ContractSection[] {
+  const purchaseOptionBalance = Math.max(
+    0,
+    (data.financial.purchaseOptionAmount ?? 0) - data.financial.depositAmount,
+  );
   const optionParagraphs = data.financial.purchaseOption
     ? [
-        `O LOCADOR concede ao LOCATÁRIO, de forma facultativa, opção de compra do EQUIPAMENTO pelo valor de ${formatCurrency(data.financial.purchaseOptionAmount ?? 0)}, quantia que não integra o total da locação e somente será exigível se a opção for exercida.`,
+        `O LOCADOR concede ao LOCATÁRIO, de forma facultativa, opção de compra do EQUIPAMENTO pelo valor total de ${formatCurrency(data.financial.purchaseOptionAmount ?? 0)}. A entrada de compra já paga, no valor de ${formatCurrency(data.financial.depositAmount)}, será abatida desse preço, restando ${formatCurrency(purchaseOptionBalance)} para a aquisição, quantia que não integra o total da locação e somente será exigível se a opção for exercida.`,
         'O exercício da opção depende da quitação integral das obrigações contratuais. Após o pagamento do preço de compra, o LOCADOR retirará o gerenciamento remoto e transferirá a propriedade do EQUIPAMENTO ao LOCATÁRIO.',
       ]
     : [];
@@ -95,7 +113,7 @@ export function buildContractSections(data: ContractPdfData): ContractSection[] 
     {
       title: 'CAPÍTULO IV - DO PRAZO',
       paragraphs: [
-        `A locação vigorará de ${formatDate(data.startDate)} a ${formatDate(data.endDate)}, correspondendo a ${data.financial.installmentCount} mensalidades, e terá início com a entrega do EQUIPAMENTO.`,
+        `A locação vigorará de ${formatDate(data.startDate)} a ${formatDate(data.endDate)}, correspondendo a ${data.financial.installmentCount} cobranças ${frequencyAdjectives[data.paymentFrequency]}, e terá início com a entrega do EQUIPAMENTO.`,
         'Parágrafo primeiro. Encerrado o prazo, o LOCATÁRIO devolverá imediatamente o EQUIPAMENTO, salvo renovação expressa e escrita.',
         'Parágrafo segundo. A permanência do EQUIPAMENTO com o LOCATÁRIO após o término não caracteriza renovação automática, permanecendo exigíveis os aluguéis proporcionais e as demais obrigações.',
         'Parágrafo terceiro. Eventual prorrogação não importará novação das garantias, que permanecerão válidas até a devolução e a quitação integral.',
@@ -104,8 +122,8 @@ export function buildContractSections(data: ContractPdfData): ContractSection[] 
     {
       title: 'CAPÍTULO V - DO PREÇO E DA FORMA DE PAGAMENTO',
       paragraphs: [
-        `O LOCATÁRIO pagará ${data.financial.installmentCount} mensalidades de ${formatCurrency(data.financial.monthlyAmount)}, com primeiro vencimento em ${formatDate(data.firstInstallmentDate)}, nas datas do quadro financeiro.`,
-        `A caução de ${formatCurrency(data.financial.depositAmount)} é uma entrada contratual paga separadamente das mensalidades, não integra a numeração das parcelas e compõe o valor total contratado de ${formatCurrency(data.financial.totalContract)}.`,
+        `O LOCATÁRIO pagará ${data.financial.installmentCount} cobranças ${frequencyAdjectives[data.paymentFrequency]} de ${formatCurrency(data.financial.monthlyAmount)}, com primeiro vencimento em ${formatDate(data.firstInstallmentDate)}, nas datas do quadro financeiro.`,
+        `A entrada de compra de ${formatCurrency(data.financial.depositAmount)} é paga separadamente das cobranças, não integra a numeração das parcelas e compõe o valor total contratado de ${formatCurrency(data.financial.totalContract)}. Trata-se de valor não reembolsável, destinado à futura aquisição do EQUIPAMENTO ao final da locação e abatido do preço de compra quando a transferência for formalizada.`,
         'Parágrafo primeiro. O pagamento ocorrerá até a data de vencimento, independentemente de aviso, cobrança ou emissão de boleto.',
         'Parágrafo segundo. Considera-se realizado o pagamento somente após a efetiva disponibilidade do valor ao LOCADOR. Tarifas e encargos da forma de pagamento escolhida correrão por conta do LOCATÁRIO.',
         ...optionParagraphs,

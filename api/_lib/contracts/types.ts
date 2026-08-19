@@ -59,6 +59,8 @@ export type ContractPhoto = {
   bytes: Uint8Array;
 };
 
+export type PaymentFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
 export type ContractPdfData = {
   contractId: string;
   contractNumber: string;
@@ -66,6 +68,7 @@ export type ContractPdfData = {
   startDate: string;
   endDate: string;
   firstInstallmentDate: string;
+  paymentFrequency: PaymentFrequency;
   venue: string | null;
   lessor: ContractParty;
   lessee: ContractParty;

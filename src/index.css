@@ -338,6 +338,8 @@ button:disabled { cursor: not-allowed; }
 .finance-metric-card-fleet { background: linear-gradient(145deg, #2563a9, #0b315f); }
 .finance-metric-card-purchases { background: linear-gradient(145deg, #475569, #172033); }
 .finance-metric-card-sales { background: linear-gradient(145deg, #079669, #04533d); }
+.finance-metric-card-result { background: linear-gradient(145deg, #0f766e, #134e4a); }
+.finance-metric-card-deposits { background: linear-gradient(145deg, #b7791f, #744210); }
 .finance-metric-card-contributions { background: linear-gradient(145deg, #0891b2, #155e75); }
 .finance-metric-card-expenses { background: linear-gradient(145deg, #e15353, #8f1d2c); }
 .finance-metric-card-withdrawals { background: linear-gradient(145deg, #e87622, #98400e); }

@@ -8,6 +8,7 @@ const data: ContractPdfData = {
   contractId: '9c00f4dd-bbf9-4d50-b47e-ea7ec953351b', contractNumber: 'GR-2026-PDF',
   issuedAt: '2026-08-04', startDate: '2026-08-04', endDate: '2026-12-10',
   firstInstallmentDate: '2026-09-10', venue: 'Sao Paulo',
+  paymentFrequency: 'monthly',
   lessor: { name: 'GR Solution', taxId: '12345678000100', phone: '11999999999', email: 'contato@example.com', address: 'Endereco do locador' },
   lessee: { name: 'Cliente de Teste', taxId: '52998224725', rg: '1234567', phone: '11988888888', email: 'cliente@example.com', address: 'Endereco do cliente' },
   device: {

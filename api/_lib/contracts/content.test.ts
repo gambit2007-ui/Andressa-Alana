@@ -8,6 +8,7 @@ const baseData: ContractPdfData = {
   contractNumber: 'GR-2026-TESTE',
   issuedAt: '2026-08-04', startDate: '2026-08-04', endDate: '2026-12-10',
   firstInstallmentDate: '2026-09-10', venue: 'Sao Paulo',
+  paymentFrequency: 'monthly',
   lessor: { name: 'GR Solution', taxId: null, phone: null, email: null, address: null },
   lessee: { name: 'Cliente', taxId: '52998224725', phone: null, email: null, address: null },
   device: {
@@ -28,7 +29,7 @@ const baseData: ContractPdfData = {
 };
 
 describe('conteudo contratual', () => {
-  it('calcula caucao separada e saldo restante', () => {
+  it('calcula entrada de compra separada e saldo restante', () => {
     const summary = calculateFinancialSummary({
       depositAmount: 480, monthlyAmount: 480, installmentCount: 4,
       installments: baseData.installments, lateFeePercent: 2, dailyInterestPercent: 1.5,
@@ -41,7 +42,7 @@ describe('conteudo contratual', () => {
     expect(baseData.installments).toHaveLength(4);
   });
 
-  it('nao soma a caucao historica duas vezes como valor recebido', () => {
+  it('nao soma a entrada historica duas vezes como valor recebido', () => {
     const legacyInstallments = [
       { number: 1, dueDate: '2026-08-03', amount: 480, status: 'paid', paidAmount: 480, paidAt: '2026-08-03' },
       ...baseData.installments.map((item) => ({ ...item, number: item.number + 1 })),
@@ -62,7 +63,7 @@ describe('conteudo contratual', () => {
     expect(summary.remainingBalance).toBe(1920);
   });
 
-  it('soma uma mensalidade paga quando a caucao e separada', () => {
+  it('soma uma mensalidade paga quando a entrada e separada', () => {
     const installments = baseData.installments.map((item, index) => index === 0
       ? { ...item, status: 'paid', paidAmount: 480, paidAt: '2026-09-10' }
       : item);
@@ -97,6 +98,7 @@ describe('conteudo contratual', () => {
     const enabledText = buildContractSections(enabled).flatMap((section) => section.paragraphs).join(' ');
     expect(enabledText).toContain('opção de compra');
     expect(enabledText).toMatch(/R\$\s*2\.000,00/);
+    expect(enabledText).toMatch(/R\$\s*1\.520,00/);
   });
 
   it('implementa os 23 capitulos do modelo juridico', () => {
@@ -111,11 +113,19 @@ describe('conteudo contratual', () => {
     expect(text).toContain('informações privadas do LOCATÁRIO');
   });
 
-  it('nao promete devolucao automatica da caucao', () => {
+  it('descreve a frequencia de cobranca selecionada', () => {
+    const weekly = { ...baseData, paymentFrequency: 'weekly' as const };
+    const text = buildContractSections(weekly).flatMap((section) => section.paragraphs).join(' ');
+    expect(text).toContain('4 cobranças semanais');
+    expect(text).not.toContain('4 mensalidades');
+  });
+
+  it('define a entrada de compra como nao reembolsavel', () => {
     const text = buildContractSections(baseData).flatMap((section) => section.paragraphs).join(' ').toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    expect(text).toContain('nao reembolsavel');
+    expect(text).toContain('futura aquisicao');
     expect(text).not.toContain('devolvida automaticamente');
-    expect(text).not.toContain('devolucao da caucao');
   });
 
   it('incrementa a versao sem substituir as anteriores', () => {

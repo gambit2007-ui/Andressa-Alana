@@ -16,6 +16,7 @@ export type ProfessionalMonthMetrics = {
   netCashFlow: number;
   rentalIncome: number;
   depositIncome: number;
+  depositRefunds: number;
   salesIncome: number;
   otherIncome: number;
   operationalRevenue: number;
@@ -46,6 +47,8 @@ export type ProfessionalFinanceSummary = {
   annualInventoryPurchases: number;
   annualSalesRevenue: number;
   annualSalesMargin: number;
+  annualPurchaseEntries: number;
+  annualPurchaseEntryReversals: number;
   annualOperatingExpenses: number;
   annualContributions: number;
   annualWithdrawals: number;
@@ -85,13 +88,12 @@ const numericSnapshotFields: Array<keyof ProfessionalMonthMetrics> = [
   'netCashFlow',
   'rentalIncome',
   'depositIncome',
+  'depositRefunds',
   'salesIncome',
   'otherIncome',
-  'operationalRevenue',
   'salesCost',
   'salesMargin',
   'operatingExpenses',
-  'operationalResult',
   'inventoryPurchases',
   'capitalAdded',
   'reversals',
@@ -153,10 +155,12 @@ export function buildProfessionalFinance({
     const rentalIncome = cash?.rentalIncome ?? 0;
     const depositIncome = cash?.depositIncome ?? 0;
     const otherIncome = cash?.otherIncome ?? 0;
+    const depositRefunds = cash?.depositRefunds ?? 0;
     const operationalRevenue = rentalIncome + depositIncome + salesIncome + otherIncome;
     const operatingExpenses = cash?.extraExpenses ?? 0;
     const reversals = cash?.reversals ?? 0;
-    const operationalResult = rentalIncome + depositIncome + salesMargin + otherIncome - operatingExpenses - reversals;
+    const operationalResult = rentalIncome + depositIncome + salesMargin + otherIncome
+      - operatingExpenses - depositRefunds - reversals;
     const live: ProfessionalMonthMetrics = {
       month,
       openingBalance: cash?.openingBalance ?? 0,
@@ -166,6 +170,7 @@ export function buildProfessionalFinance({
       netCashFlow: cash?.netMovement ?? 0,
       rentalIncome,
       depositIncome,
+      depositRefunds,
       salesIncome,
       otherIncome,
       operationalRevenue: roundMoney(operationalRevenue),
@@ -218,6 +223,8 @@ export function buildProfessionalFinance({
     annualInventoryPurchases: roundMoney(months.reduce((sum, month) => sum + month.inventoryPurchases, 0)),
     annualSalesRevenue: roundMoney(months.reduce((sum, month) => sum + month.salesIncome, 0)),
     annualSalesMargin: roundMoney(months.reduce((sum, month) => sum + month.salesMargin, 0)),
+    annualPurchaseEntries: roundMoney(months.reduce((sum, month) => sum + month.depositIncome, 0)),
+    annualPurchaseEntryReversals: roundMoney(months.reduce((sum, month) => sum + month.depositRefunds, 0)),
     annualOperatingExpenses: roundMoney(months.reduce((sum, month) => sum + month.operatingExpenses, 0)),
     annualContributions: roundMoney(months.reduce((sum, month) => sum + month.capitalAdded, 0)),
     annualWithdrawals: roundMoney(months.reduce((sum, month) => sum + month.ownerWithdrawals, 0)),

@@ -16,6 +16,7 @@ import type {
   MdmDevice,
   Payment,
   OrganizationContractSettings,
+  PaymentFrequency,
 } from '../types';
 import type {
   CashTransactionFormData,
@@ -61,6 +62,7 @@ const normalizeDeviceSale = (row: DeviceSale): DeviceSale => ({
 
 const normalizeContract = (row: Contract): Contract => ({
   ...row,
+  payment_frequency: (row.payment_frequency ?? 'monthly') as PaymentFrequency,
   due_day: Number(row.due_day),
   term_months: Number(row.term_months),
   monthly_amount: toMoney(row.monthly_amount),
@@ -327,12 +329,13 @@ export async function listContracts(): Promise<Contract[]> {
 }
 
 export async function createContract(organizationId: string, values: ContractFormData): Promise<string> {
-  const { data, error } = await db().rpc('create_contract_with_separate_deposit', {
+  const { data, error } = await db().rpc('create_contract_with_payment_frequency', {
     p_organization_id: organizationId,
     p_client_id: values.client_id,
     p_device_id: values.device_id,
     p_start_date: values.start_date,
     p_first_installment_date: values.first_installment_date,
+    p_payment_frequency: values.payment_frequency,
     p_due_day: values.due_day,
     p_term_months: values.term_months,
     p_monthly_amount: values.monthly_amount,
@@ -353,7 +356,7 @@ export async function createContract(organizationId: string, values: ContractFor
 export async function updateContract(contractId: string, values: ContractFormData, legacyMode = false): Promise<string> {
   const functionName = legacyMode
     ? 'update_contract_with_installments'
-    : 'update_contract_with_separate_deposit';
+    : 'update_contract_with_payment_frequency';
   const commonPayload = {
     p_contract_id: contractId,
     p_client_id: values.client_id,
@@ -371,6 +374,7 @@ export async function updateContract(contractId: string, values: ContractFormDat
   const payload = legacyMode ? commonPayload : {
     ...commonPayload,
     p_first_installment_date: values.first_installment_date,
+    p_payment_frequency: values.payment_frequency,
     p_deposit_paid_at: values.deposit_amount > 0 ? values.deposit_paid_at : null,
     p_deposit_payment_method: values.deposit_amount > 0 ? values.deposit_payment_method : null,
     p_indemnity_value: values.indemnity_value,
@@ -536,124 +540,6 @@ export async function createCashTransaction(
   throwIfError(error);
   const row = data as unknown as CashTransaction;
   return { ...row, amount: toMoney(row.amount) };
-}
-
-export type CashLedgerConsolidationResult = {
-  reversedContributions: number;
-  contributionCreated: boolean;
-  freightCreated: boolean;
-};
-
-const consolidatedContributionDescription = 'Aporte unico para compras e operacoes';
-const wendelFreightDescription = 'Frete Wendel';
-
-export async function consolidateCashLedger(
-  organizationId: string,
-  occurredOn: string,
-): Promise<CashLedgerConsolidationResult> {
-  const client = db();
-  const { data: contributionData, error: contributionError } = await client
-    .from('cash_transactions')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .eq('kind', 'capital_contribution')
-    .eq('direction', 'in');
-  throwIfError(contributionError);
-
-  const contributions = ((contributionData ?? []) as unknown as CashTransaction[])
-    .filter((transaction) => transaction.status === 'confirmed');
-  let canonicalContribution = contributions.find((transaction) => (
-    toMoney(transaction.amount) === 24000
-    && transaction.description.trim().toLowerCase() === consolidatedContributionDescription.toLowerCase()
-  ));
-  let contributionCreated = false;
-
-  if (!canonicalContribution) {
-    const { data, error } = await client.from('cash_transactions').insert({
-      organization_id: organizationId,
-      kind: 'capital_contribution',
-      direction: 'in',
-      amount: 24000,
-      occurred_on: occurredOn,
-      description: consolidatedContributionDescription,
-      status: 'confirmed',
-    }).select('*').single();
-    throwIfError(error);
-    canonicalContribution = data as unknown as CashTransaction;
-    contributionCreated = true;
-  }
-
-  const contributionIdsToReverse = contributions
-    .filter((transaction) => transaction.id !== canonicalContribution?.id)
-    .map((transaction) => transaction.id);
-  if (contributionIdsToReverse.length > 0) {
-    const { error } = await client.from('cash_transactions')
-      .update({ status: 'reversed' })
-      .in('id', contributionIdsToReverse);
-    throwIfError(error);
-  }
-
-  const { data: freightData, error: freightQueryError } = await client
-    .from('cash_transactions')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .eq('direction', 'out')
-    .eq('amount', 1200)
-    .eq('status', 'confirmed');
-  throwIfError(freightQueryError);
-
-  const freightRows = (freightData ?? []) as unknown as CashTransaction[];
-  const describedFreightRows = freightRows.filter((transaction) => {
-    const description = transaction.description.trim().toLowerCase();
-    return description.includes('frete') || description.includes('wendel');
-  });
-  const supplierRows = freightRows.filter((transaction) => transaction.kind === 'supplier');
-  const freightCandidates = [...new Map([
-    ...describedFreightRows,
-    ...(supplierRows.length === 1 ? supplierRows : []),
-  ].map((transaction) => [transaction.id, transaction])).values()];
-  let canonicalFreight = freightCandidates.find((transaction) => transaction.kind === 'operating_expense')
-    ?? freightCandidates[0];
-  let freightCreated = false;
-
-  if (!canonicalFreight) {
-    const { error } = await client.from('cash_transactions').insert({
-      organization_id: organizationId,
-      kind: 'operating_expense',
-      direction: 'out',
-      amount: 1200,
-      occurred_on: occurredOn,
-      description: wendelFreightDescription,
-      status: 'confirmed',
-    });
-    throwIfError(error);
-    freightCreated = true;
-  } else if (canonicalFreight.kind !== 'operating_expense'
-    || canonicalFreight.description !== wendelFreightDescription) {
-    const { data, error } = await client.from('cash_transactions')
-      .update({ kind: 'operating_expense', description: wendelFreightDescription })
-      .eq('id', canonicalFreight.id)
-      .select('*')
-      .single();
-    throwIfError(error);
-    canonicalFreight = data as unknown as CashTransaction;
-  }
-
-  const duplicateFreightIds = freightCandidates
-    .filter((transaction) => transaction.id !== canonicalFreight?.id)
-    .map((transaction) => transaction.id);
-  if (duplicateFreightIds.length > 0) {
-    const { error } = await client.from('cash_transactions')
-      .update({ status: 'reversed' })
-      .in('id', duplicateFreightIds);
-    throwIfError(error);
-  }
-
-  return {
-    reversedContributions: contributionIdsToReverse.length,
-    contributionCreated,
-    freightCreated,
-  };
 }
 
 export async function recordPayment(input: {

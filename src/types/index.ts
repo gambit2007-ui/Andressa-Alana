@@ -119,6 +119,8 @@ export type ContractStatus =
   | 'cancelled'
   | 'renegotiated';
 
+export type PaymentFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
 export type Contract = {
   id: string;
   organization_id: string;
@@ -128,6 +130,7 @@ export type Contract = {
   start_date: string;
   end_date: string;
   first_installment_date?: string | null;
+  payment_frequency: PaymentFrequency;
   due_day: number;
   term_months: number;
   monthly_amount: number;

@@ -12,6 +12,7 @@ const month: ProfessionalMonthMetrics = {
   netCashFlow: 10785,
   rentalIncome: 0,
   depositIncome: 3865,
+  depositRefunds: 0,
   salesIncome: 3700,
   otherIncome: 0,
   operationalRevenue: 7565,
